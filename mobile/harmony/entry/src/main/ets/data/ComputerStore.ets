@@ -1,6 +1,7 @@
 import common from '@ohos.app.ability.common';
 import preferences from '@ohos.data.preferences';
 import { gatewayConnection } from '../security/GatewayURL';
+import { NavigationAppearance, decodeNavigationAppearance } from '../appearance/NavigationAppearance';
 
 export class Computer {
   base: string = '';
@@ -61,5 +62,18 @@ export class ComputerStore {
 
   async savedAlerts(): Promise<boolean> {
     return this.prefs ? await this.prefs.get('alerts', false) === true : false;
+  }
+
+  async savedNavigationAppearance(): Promise<NavigationAppearance> {
+    if (!this.prefs) return new NavigationAppearance();
+    const saved = await this.prefs.get('navigationAppearance', '');
+    return typeof saved === 'string' ? decodeNavigationAppearance(saved) : new NavigationAppearance();
+  }
+
+  async navigationAppearance(value: NavigationAppearance): Promise<void> {
+    if (!this.prefs) throw new Error('应用设置尚未就绪，请重试');
+    const saved = new NavigationAppearance(value.system, value.blur, value.thickness);
+    await this.prefs.put('navigationAppearance', JSON.stringify(saved));
+    await this.prefs.flush();
   }
 }

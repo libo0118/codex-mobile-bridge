@@ -5,6 +5,7 @@ import util from '@ohos.util';
 import webview from '@ohos.web.webview';
 import window from '@ohos.window';
 import notificationManager from '@ohos.notificationManager';
+import deviceInfo from '@ohos.deviceInfo';
 import { scanBarcode, scanCore } from '@kit.ScanKit';
 import { Computer, ComputerStore } from '../data/ComputerStore';
 import { connectionURL, gatewayConnection, sameGateway, isPreviewShell, acceptsDownload, externalHTTP, validPrompt, chatURL } from '../security/GatewayURL';
@@ -14,6 +15,8 @@ import { AttachmentDownload, DownloadFile, selectUpload, saveAttachment, discard
 import { ForegroundEvents } from '../notifications/ForegroundEvents';
 import { ServiceSite, ServiceStore } from '../services/ServiceSite';
 import { ServiceWeb } from '../services/ServiceWeb';
+import { NavigationAppearance } from '../appearance/NavigationAppearance';
+import { detectSystemGlass, NavigationMaterial, SystemGlassAdapter } from '../appearance/NavigationMaterial';
 
 class BarColors {
   top: string = '';
@@ -45,6 +48,15 @@ struct Index {
   @State serviceName: string = '';
   @State serviceAddress: string = '';
   @State savingServices: string[] = [];
+  @State navigationBlur: number = 100;
+  @State navigationSystem: boolean = true;
+  @State navigationThickness: number = 1;
+  @State editNavigationBlur: number = 100;
+  @State editNavigationSystem: boolean = true;
+  @State editNavigationThickness: number = 1;
+  @State navigationSettings: boolean = false;
+  @State savingNavigation: boolean = false;
+  @State systemGlassAvailable: boolean = false;
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   private store: ComputerStore = new ComputerStore();
   private controller: webview.WebviewController = new webview.WebviewController();
@@ -60,6 +72,7 @@ struct Index {
   private serviceStore: ServiceStore = new ServiceStore();
   private configGeneration: number = 0;
   private codexTop: string = '#f5f5f3';
+  private systemGlass?: SystemGlassAdapter;
 
   aboutToAppear(): void { this.updateBars(this.codexTop); this.initialize(); }
   aboutToDisappear(): void { this.events.stop(); this.cancelDownload(); this.flushCookies(); }
@@ -70,12 +83,20 @@ struct Index {
       this.computers = await this.store.load(this.context);
       this.language = await this.store.savedLanguage();
       this.alerts = await this.store.savedAlerts();
+      const appearance = await this.store.savedNavigationAppearance();
+      this.navigationBlur = appearance.blur;
+      this.navigationSystem = appearance.system;
+      this.navigationThickness = appearance.thickness;
       this.services = await this.serviceStore.load(this.context);
       this.scripts = await loadMobileScripts(this.context);
       webview.WebCookieManager.putAcceptCookieEnabled(true);
       webview.WebCookieManager.putAcceptThirdPartyCookieEnabled(false);
       this.ready = true;
       this.notificationOpened();
+      detectSystemGlass(deviceInfo.sdkApiVersion, () => import('../appearance/SystemGlass26')).then((adapter: SystemGlassAdapter | undefined) => {
+        this.systemGlass = adapter;
+        this.systemGlassAvailable = adapter !== undefined;
+      });
     } catch (_) { this.message(this.L('无法读取应用资源，请重新打开或安装应用。', 'Cannot load app resources. Please restart or reinstall.')); }
   }
 
@@ -365,6 +386,90 @@ struct Index {
     return selected ? $r('app.media.nav_magpie_selected') : $r('app.media.nav_magpie');
   }
 
+  private openNavigationSettings(): void {
+    if (!this.ready || this.savingNavigation || this.navigationSettings) return;
+    this.editNavigationBlur = this.navigationBlur;
+    this.editNavigationSystem = this.navigationSystem;
+    this.editNavigationThickness = this.navigationThickness;
+    this.navigationSettings = true;
+  }
+
+  private navigationMaterial(): NavigationMaterial {
+    return new NavigationMaterial(this.navigationSettings ? this.editNavigationBlur : this.navigationBlur,
+      this.navigationSettings ? this.editNavigationSystem : this.navigationSystem,
+      this.navigationSettings ? this.editNavigationThickness : this.navigationThickness,
+      this.systemGlassAvailable ? this.systemGlass : undefined);
+  }
+
+  private async saveNavigationSettings(): Promise<void> {
+    if (this.savingNavigation) return;
+    const value = new NavigationAppearance(this.editNavigationSystem, this.editNavigationBlur, this.editNavigationThickness);
+    this.savingNavigation = true;
+    try {
+      await this.store.navigationAppearance(value);
+      this.navigationBlur = value.blur;
+      this.navigationSystem = value.system;
+      this.navigationThickness = value.thickness;
+      this.navigationSettings = false;
+    } catch (error) { this.error(error as Error); }
+    finally { this.savingNavigation = false; }
+  }
+
+  @Builder
+  private navigationSettingsPanel() {
+    Scroll() {
+      Column({ space: 16 }) {
+        Text(this.L('底栏外观', 'Navigation appearance')).fontSize(23).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%')
+        Stack() {
+          Row({ space: 24 }) {
+            Circle().width(54).height(54).fill('#A9C8FF')
+            Circle().width(42).height(42).fill('#FFD9A5')
+          }
+          Row({ space: 8 }) {
+            Image($r('app.media.nav_codex_selected')).width(24).height(24)
+            Text('Codex+').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#303640')
+          }.width('85%').height(54).justifyContent(FlexAlign.Center).borderRadius(27).attributeModifier(this.navigationMaterial())
+        }.height(76).width('100%')
+        Row({ space: 12 }) {
+          Text(this.L('系统沉浸材质', 'System immersive material')).fontSize(16).fontColor('#202124').layoutWeight(1)
+          Toggle({ type: ToggleType.Switch, isOn: this.editNavigationSystem && this.systemGlassAvailable })
+            .enabled(this.systemGlassAvailable && !this.savingNavigation)
+            .onChange((value: boolean) => { this.editNavigationSystem = value; })
+        }.width('100%').constraintSize({ minHeight: 44 })
+        if (this.systemGlassAvailable && this.editNavigationSystem) {
+          Text(this.L('系统提供五档材质厚度；实际效果遵循设备能力和系统设置。', 'Five material presets follow this device and its system settings.'))
+            .fontSize(13).fontColor('#59636F').width('100%')
+          Row({ space: 4 }) {
+            ForEach(this.language === 'en' ? ['Lightest', 'Thin', 'Regular', 'Thick', 'Thickest'] : ['超薄', '薄', '标准', '厚', '超厚'], (label: string, index: number) => {
+              Button(label).layoutWeight(1).height(44).padding({ left: 2, right: 2 }).fontSize(12)
+                .fontColor(this.editNavigationThickness === index ? '#FFFFFF' : '#303640')
+                .backgroundColor(this.editNavigationThickness === index ? '#0A59F7' : '#E8EDF2').borderRadius(12)
+                .enabled(!this.savingNavigation).onClick(() => { this.editNavigationThickness = index; })
+            }, (label: string) => label)
+          }.width('100%')
+        } else {
+          Text(this.systemGlassAvailable ? this.L('可连续调整背景模糊，拖动时实时预览。', 'Adjust background blur with a live preview.') :
+            this.L('此设备目前未启用系统沉浸材质，使用可调背景模糊。', 'System immersive material is unavailable here; adjustable background blur is used.'))
+            .fontSize(13).fontColor('#59636F').width('100%')
+          Row() {
+            Text(this.L('模糊强度', 'Blur strength')).fontSize(16).fontColor('#202124').layoutWeight(1)
+            Text(this.editNavigationBlur.toString() + '%').fontSize(14).fontColor('#59636F')
+          }.width('100%')
+          Slider({ value: this.editNavigationBlur, min: 0, max: 100, step: 1 }).width('100%').enabled(!this.savingNavigation)
+            .showTips(true).onChange((value: number) => { this.editNavigationBlur = Math.round(value); })
+        }
+        Text(this.L('长按任意页签的底栏可再次打开。设置只保存在本机，不刷新网页。', 'Long-press the navigation on any tab to return. Settings stay on this device; pages keep their state.'))
+          .fontSize(13).fontColor('#59636F').width('100%')
+        Row({ space: 12 }) {
+          Button(this.L('恢复默认', 'Reset')).layoutWeight(1).height(48).backgroundColor('#E8EDF2').fontColor('#303640')
+            .enabled(!this.savingNavigation).onClick(() => { this.editNavigationBlur = 100; this.editNavigationSystem = true; this.editNavigationThickness = 1; })
+          Button(this.savingNavigation ? this.L('保存中…', 'Saving…') : this.L('完成', 'Done')).layoutWeight(1).height(48)
+            .backgroundColor('#0A59F7').fontColor('#FFFFFF').enabled(!this.savingNavigation).onClick(() => { this.saveNavigationSettings(); })
+        }.width('100%')
+      }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 8, bottom: 24 })
+    }.width('100%').height('100%')
+  }
+
   @Builder
   private navigationItem(id: string, label: string) {
     Button({ type: ButtonType.Normal }) {
@@ -447,6 +552,7 @@ struct Index {
   }
 
   onBackPress(): boolean {
+    if (this.navigationSettings) { if (!this.savingNavigation) this.navigationSettings = false; return true; }
     if (this.configId) { if (!this.savingServices.includes(this.configId)) this.closeServiceConfig(); return true; }
     if (this.activeTab !== 'codex') { this.selectTab('codex'); return true; }
     if (!this.connected) return false;
@@ -466,6 +572,7 @@ struct Index {
         this.webAction("(() => { if (typeof window.BridgeNavigation?.accounts === 'function') return window.BridgeNavigation.accounts(); document.getElementById('accounts-button')?.click(); })()");
       })
       MenuItem({ content: this.L('外观与显示', 'Appearance') }).onClick(() => { this.webAction("document.querySelector('[data-open-appearance]')?.click()"); })
+      MenuItem({ content: this.L('底栏外观', 'Navigation appearance') }).onClick(() => { this.openNavigationSettings(); })
       MenuItem({ content: this.L('刷新页面', 'Refresh') }).onClick(() => { this.controller.refresh(); })
       MenuItem({ content: this.alerts ? this.L('关闭前台任务通知', 'Disable foreground alerts') : this.L('开启前台任务通知', 'Enable foreground alerts') }).onClick(() => { this.toggleAlerts(); })
       MenuItem({ content: this.L('关于鸿蒙版', 'About HarmonyOS') }).onClick(() => {
@@ -599,11 +706,11 @@ struct Index {
           }, (site: ServiceSite) => site.id)
         }.padding({ left: 6, right: 6, top: 5, bottom: 5 }).width('90%').constraintSize({ maxWidth: 380 })
           .borderRadius(999)
-          .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR, { colorMode: ThemeColorMode.LIGHT,
-            policy: BlurStyleActivePolicy.FOLLOWS_WINDOW_ACTIVE_STATE, inactiveColor: '#F2F5F8' })
-          .border({ width: 1, color: '#E6FFFFFF' })
-          .shadow({ radius: 20, color: '#1A203047', offsetX: 0, offsetY: 7 })
-      }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 12 })
+          .attributeModifier(this.navigationMaterial())
+          .priorityGesture(LongPressGesture({ repeat: false, duration: 600 }).onAction(() => { this.openNavigationSettings(); }))
+      }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 2 })
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
+      .bindSheet($$this.navigationSettings, this.navigationSettingsPanel(), { height: '70%', showClose: !this.savingNavigation,
+        backgroundColor: '#f5f5f3' })
   }
 }
