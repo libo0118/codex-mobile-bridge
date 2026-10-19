@@ -3,10 +3,12 @@ import importlib.util
 import json
 from pathlib import Path
 import shutil
+import struct
 import tempfile
 import unittest
 from unittest.mock import patch
 import zipfile
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('harmony_builder', ROOT / 'scripts/build-mobile-harmony.py')
@@ -66,8 +68,22 @@ class HarmonyBuildTests(unittest.TestCase):
         for name in ('app_icon.png',) + BUILDER.NAV_ICONS:
             with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, 'Missing packaged HarmonyOS icon'):
                 BUILDER.verify_hap(self.hap(missing='resources/base/media/' + name), self.root, self.app)
-        with self.assertRaisesRegex(RuntimeError, '1024px PNG'):
+        with self.assertRaisesRegex(RuntimeError, '512px or 1024px PNG'):
             BUILDER.verify_hap(self.hap(altered={'resources/base/media/app_icon.png': b'not an icon'}), self.root, self.app)
+
+    def test_sdk_optimized_icon_keeps_a_valid_size_while_the_source_stays_1024(self):
+        def png(size):
+            def chunk(kind, data):
+                return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+            header = struct.pack('>IIBBBBB', size, size, 8, 2, 0, 0, 0)
+            pixels = zlib.compress((b'\x00' + b'\x23\x64\x54' * size) * size)
+            return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header) + chunk(b'IDAT', pixels) + chunk(b'IEND', b'')
+        BUILDER.verify_hap(self.hap(altered={'resources/base/media/app_icon.png': png(512)}), self.root, self.app)
+        with self.assertRaisesRegex(RuntimeError, '512px or 1024px PNG'):
+            BUILDER.verify_hap(self.hap(altered={'resources/base/media/app_icon.png': png(256)}), self.root, self.app)
+        (self.root / BUILDER.ICON_SOURCE).write_bytes(png(512))
+        with self.assertRaisesRegex(RuntimeError, 'source must be a 1024px PNG'):
+            BUILDER.prepare_resources(self.root)
 
     def test_version_mismatch_and_missing_source_fail_before_build(self):
         package = self.root / 'package.json'

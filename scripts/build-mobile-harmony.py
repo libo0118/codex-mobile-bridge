@@ -43,6 +43,10 @@ def prepare_resources(root):
     for source, destination in inputs:
         if source.is_symlink() or not source.is_file():
             raise RuntimeError('Missing regular shared resource: ' + str(source))
+        if source == root / ICON_SOURCE:
+            icon = source.read_bytes()
+            if len(icon) < 24 or icon[:8] != b'\x89PNG\r\n\x1a\n' or struct.unpack('>II', icon[16:24]) != (1024, 1024):
+                raise RuntimeError('HarmonyOS launcher source must be a 1024px PNG.')
         if destination.is_symlink() or not destination.resolve().is_relative_to(project.resolve()):
             raise RuntimeError('Generated resource escapes the HarmonyOS project: ' + str(destination))
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -73,10 +77,10 @@ def verify_hap(hap, root, app):
         for name in ('app_icon.png',) + NAV_ICONS:
             if media + name not in names or archive.getinfo(media + name).file_size == 0:
                 raise RuntimeError('Missing packaged HarmonyOS icon: ' + name)
-        # The resource compiler can optimize PNG bytes, but must retain the full-size launcher icon.
+        # The SDK resource compiler reduces a 1024px source to a 512px packaged icon.
         icon = archive.read(media + 'app_icon.png')
-        if len(icon) < 24 or icon[:8] != b'\x89PNG\r\n\x1a\n' or struct.unpack('>II', icon[16:24]) != (1024, 1024):
-            raise RuntimeError('Packaged HarmonyOS launcher icon must be a 1024px PNG.')
+        if len(icon) < 24 or icon[:8] != b'\x89PNG\r\n\x1a\n' or struct.unpack('>II', icon[16:24]) not in ((512, 512), (1024, 1024)):
+            raise RuntimeError('Packaged HarmonyOS launcher icon must be a 512px or 1024px PNG.')
 
 
 def sdk_info():
