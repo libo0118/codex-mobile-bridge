@@ -68,7 +68,10 @@ jobs:
           cat "$HOS_SDK_HOME/default/sdk-pkg.json"
           find "$(dirname "$HOS_SDK_HOME")/tool" -maxdepth 4 -name hvigor-config.json5 -print -exec cat {} \;
       - name: Assemble and verify unsigned HAP
-        run: python -B scripts/build-mobile-harmony.py
+        run: |
+          python -B scripts/build-mobile-harmony.py
+          git status --short
+          git diff --exit-code
       - uses: actions/upload-artifact@v4
         with:
           name: mobile-HarmonyOS-unsigned

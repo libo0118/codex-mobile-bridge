@@ -31,6 +31,9 @@ dist/
 /mobile/harmony/.idea/
 /mobile/harmony/oh_modules/
 /mobile/harmony/entry/oh_modules/
+# The pinned CLI generates these for the dependency-free app and module.
+/mobile/harmony/oh-package-lock.json5
+/mobile/harmony/entry/oh-package-lock.json5
 /mobile/harmony/entry/build/
 /mobile/harmony/build/
 /mobile/harmony/local.properties
