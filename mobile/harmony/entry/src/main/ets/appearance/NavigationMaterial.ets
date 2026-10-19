@@ -13,6 +13,16 @@ export async function detectSystemGlass(apiVersion: number, loader: () => Promis
   try { return (await loader()).createSystemGlass(); } catch (_) { return undefined; }
 }
 
+// Keep the capsule silhouette on a parent: systemMaterial replaces its target's border and shadow.
+export class NavigationChrome implements AttributeModifier<RowAttribute> {
+  applyNormalAttribute(target: RowAttribute): void {
+    target.borderRadius(999);
+    target.linearGradient({ angle: 180, colors: [['#B8FFFFFF', 0], ['#40F3F6F9', 0.45], ['#70D5DEE7', 1]] });
+    target.border({ width: 1, color: { top: '#F5FFFFFF', left: '#F5FFFFFF', right: '#33677786', bottom: '#52677786' } });
+    target.shadow({ radius: 18, color: '#26303C4A', offsetX: 0, offsetY: 6 });
+  }
+}
+
 export class NavigationMaterial implements AttributeModifier<RowAttribute> {
   private blur: number;
   private system: boolean;
@@ -35,9 +45,7 @@ export class NavigationMaterial implements AttributeModifier<RowAttribute> {
       } catch (_) { /* A device-side material error must leave the basic navigation usable. */ }
     }
     if (this.adapter) { try { this.adapter.clear(target); } catch (_) {} }
-    target.backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR, { colorMode: ThemeColorMode.LIGHT, scale: this.blur / 100,
-      policy: BlurStyleActivePolicy.FOLLOWS_WINDOW_ACTIVE_STATE, inactiveColor: '#F2F5F8' });
-    target.border({ width: 1, color: '#E6FFFFFF' });
-    target.shadow({ radius: 20, color: '#1A203047', offsetX: 0, offsetY: 7 });
+    target.backgroundBlurStyle(BlurStyle.COMPONENT_ULTRA_THIN, { colorMode: ThemeColorMode.LIGHT, scale: this.blur / 100,
+      policy: BlurStyleActivePolicy.FOLLOWS_WINDOW_ACTIVE_STATE, inactiveColor: '#99EDF2F6' });
   }
 }

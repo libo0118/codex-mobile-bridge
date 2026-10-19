@@ -16,7 +16,7 @@ import { ForegroundEvents } from '../notifications/ForegroundEvents';
 import { ServiceSite, ServiceStore } from '../services/ServiceSite';
 import { ServiceWeb } from '../services/ServiceWeb';
 import { NavigationAppearance } from '../appearance/NavigationAppearance';
-import { detectSystemGlass, NavigationMaterial, SystemGlassAdapter, SystemGlassModule } from '../appearance/NavigationMaterial';
+import { detectSystemGlass, NavigationChrome, NavigationMaterial, SystemGlassAdapter, SystemGlassModule } from '../appearance/NavigationMaterial';
 
 class BarColors {
   top: string = '';
@@ -368,7 +368,7 @@ struct Index {
 
   private updateBars(top: string): void {
     window.getLastWindow(this.context).then((current: window.Window) => {
-      current.setWindowSystemBarProperties({ statusBarColor: top, navigationBarColor: '#f5f5f3',
+      current.setWindowSystemBarProperties({ statusBarColor: top, navigationBarColor: '#FFFFFF',
         statusBarContentColor: this.barText(top), navigationBarContentColor: '#202124' }).catch(() => {});
     }).catch(() => {});
   }
@@ -420,16 +420,15 @@ struct Index {
     Scroll() {
       Column({ space: 16 }) {
         Text(this.L('底栏外观', 'Navigation appearance')).fontSize(23).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%')
-        Stack() {
-          Row({ space: 24 }) {
-            Circle().width(54).height(54).fill('#A9C8FF')
-            Circle().width(42).height(42).fill('#FFD9A5')
-          }
-          Row({ space: 8 }) {
-            Image($r('app.media.nav_codex_selected')).width(24).height(24)
-            Text('Codex+').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#303640')
-          }.width('85%').height(54).justifyContent(FlexAlign.Center).borderRadius(27).attributeModifier(this.navigationMaterial())
-        }.height(76).width('100%')
+        Row() {
+          Row() {
+            Row({ space: 8 }) {
+              Image($r('app.media.nav_codex_selected')).width(24).height(24)
+              Text('Codex+').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#303640')
+            }.width('100%').constraintSize({ minHeight: 52 }).justifyContent(FlexAlign.Center)
+              .borderRadius(999).clip(true).attributeModifier(this.navigationMaterial())
+          }.width('85%').padding(1).attributeModifier(new NavigationChrome())
+        }.constraintSize({ minHeight: 76 }).width('100%').justifyContent(FlexAlign.Center)
         Row({ space: 12 }) {
           Text(this.L('系统沉浸材质', 'System immersive material')).fontSize(16).fontColor('#202124').layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.editNavigationSystem && this.systemGlassAvailable })
@@ -699,16 +698,17 @@ struct Index {
         }
       }.width('100%').layoutWeight(1)
       Row() {
-        Row({ space: 2 }) {
-          this.navigationItem('codex', 'Codex')
-          ForEach(this.services, (site: ServiceSite) => {
-            this.navigationItem(site.id, site.name)
-          }, (site: ServiceSite) => site.id)
-        }.padding({ left: 6, right: 6, top: 5, bottom: 5 }).width('90%').constraintSize({ maxWidth: 380 })
-          .borderRadius(999)
-          .attributeModifier(this.navigationMaterial())
+        Row() {
+          Row({ space: 2 }) {
+            this.navigationItem('codex', 'Codex')
+            ForEach(this.services, (site: ServiceSite) => {
+              this.navigationItem(site.id, site.name)
+            }, (site: ServiceSite) => site.id)
+          }.padding({ left: 5, right: 5, top: 4, bottom: 4 }).width('100%')
+            .borderRadius(999).clip(true).attributeModifier(this.navigationMaterial())
+        }.width('90%').constraintSize({ maxWidth: 380 }).padding(1).attributeModifier(new NavigationChrome())
           .priorityGesture(LongPressGesture({ repeat: false, duration: 600 }).onAction(() => { this.openNavigationSettings(); }))
-      }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 2 })
+      }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 2 }).backgroundColor('#FFFFFF')
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
       .bindSheet($$this.navigationSettings, this.navigationSettingsPanel(), { height: '70%', showClose: !this.savingNavigation,
         backgroundColor: '#f5f5f3' })

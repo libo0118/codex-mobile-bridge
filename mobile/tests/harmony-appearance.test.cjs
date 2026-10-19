@@ -42,7 +42,7 @@ test('appearance persistence survives a new store and cannot overwrite connectio
 });
 
 const graphics = load('appearance/NavigationMaterial.ets', ['detectSystemGlass', 'NavigationMaterial'], {
-  BlurStyle: { NONE: 'none', COMPONENT_REGULAR: 'regular' }, ThemeColorMode: { LIGHT: 'light' },
+  BlurStyle: { NONE: 'none', COMPONENT_ULTRA_THIN: 'ultra-thin' }, ThemeColorMode: { LIGHT: 'light' },
   BlurStyleActivePolicy: { FOLLOWS_WINDOW_ACTIVE_STATE: 'focus' }
 });
 
@@ -67,14 +67,51 @@ test('material modes are exclusive and a custom blur value reaches the native AP
   assert.deepEqual(plain(calls), [['blur', 'none', null], ['system', 3]]);
   calls.length = 0;
   new graphics.NavigationMaterial(37, false, 3, adapter).applyNormalAttribute(target);
-  assert.equal(calls[0][0], 'clear'); assert.equal(calls[1][1], 'regular'); assert.equal(calls[1][2].scale, .37);
+  assert.equal(calls[0][0], 'clear'); assert.equal(calls[1][1], 'ultra-thin'); assert.equal(calls[1][2].scale, .37);
   calls.length = 0;
   new graphics.NavigationMaterial(0, true, 3).applyNormalAttribute(target);
-  assert.equal(calls[0][1], 'regular'); assert.equal(calls[0][2].scale, 0);
+  assert.equal(calls[0][1], 'ultra-thin'); assert.equal(calls[0][2].scale, 0);
   calls.length = 0;
   new graphics.NavigationMaterial(NaN, false, 3).applyNormalAttribute(target);
   assert.equal(calls[0][2].scale, 1);
   calls.length = 0;
   new graphics.NavigationMaterial(55, true, 1, { apply() { throw new Error('device material error'); }, clear() { throw new Error('clear unavailable'); } }).applyNormalAttribute(target);
-  assert.equal(calls[0][1], 'none'); assert.equal(calls[1][1], 'regular'); assert.equal(calls[1][2].scale, .55);
+  assert.equal(calls[0][1], 'none'); assert.equal(calls[1][1], 'ultra-thin'); assert.equal(calls[1][2].scale, .55);
+});
+
+test('capsule chrome survives native material resets on its independent child', () => {
+  const { NavigationChrome } = load('appearance/NavigationMaterial.ets', ['NavigationChrome']);
+  const target = () => {
+    const state = {};
+    const result = { state };
+    for (const key of ['border', 'shadow', 'linearGradient', 'borderRadius', 'backgroundColor']) {
+      result[key] = value => { state[key] = value; return result; };
+    }
+    result.backgroundBlurStyle = (style, options) => { state.blur = { style, options }; return result; };
+    result.systemMaterial = value => {
+      // The documented native reset only touches the material child, never the outer chrome.
+      for (const key of ['border', 'shadow', 'backgroundColor', 'linearGradient']) delete state[key];
+      state.material = value;
+      return result;
+    };
+    return result;
+  };
+  const uiMaterial = { ImmersiveStyle: { ULTRA_THIN: 0, THIN: 1, REGULAR: 2, THICK: 3, ULTRA_THICK: 4 },
+    Material: { empty: { empty: true } }, ImmersiveMaterial: class { constructor(options) { this.options = options; } },
+    isImmersiveMaterialSupported: () => true };
+  const adapter = load('appearance/SystemGlass26.ets', ['createSystemGlass'], { uiMaterial }).createSystemGlass();
+  for (const [system, blur, material] of [[true, 100, adapter], [false, 0, adapter], [false, 100, adapter], [true, 100, undefined],
+    [true, 37, { apply(value) { value.systemMaterial({}); throw new Error('device failure'); }, clear(value) { value.systemMaterial({ empty: true }); } }]]) {
+    const shell = target(), child = target();
+    new NavigationChrome().applyNormalAttribute(shell);
+    const before = plain(shell.state);
+    new graphics.NavigationMaterial(blur, system, 1, material).applyNormalAttribute(child);
+    assert.deepEqual(plain(shell.state), before);
+    assert.ok(shell.state.border.width > 0);
+    assert.notEqual(shell.state.border.color.top, shell.state.border.color.bottom);
+    assert.ok(shell.state.shadow.radius > 0);
+    assert.equal(child.state.border, undefined); assert.equal(child.state.shadow, undefined);
+    if (child.state.material?.options) assert.equal(child.state.material.options.applyShadow, false);
+    else assert.equal(child.state.blur.options.scale, blur / 100);
+  }
 });

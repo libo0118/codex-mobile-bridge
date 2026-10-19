@@ -9,7 +9,7 @@ class ImmersiveGlass implements SystemGlassAdapter {
     else if (thickness === 2) style = uiMaterial.ImmersiveStyle.REGULAR;
     else if (thickness === 3) style = uiMaterial.ImmersiveStyle.THICK;
     else if (thickness === 4) style = uiMaterial.ImmersiveStyle.ULTRA_THICK;
-    target.systemMaterial(new uiMaterial.ImmersiveMaterial({ style: style }));
+    target.systemMaterial(new uiMaterial.ImmersiveMaterial({ style: style, applyShadow: false }));
   }
 
   clear(target: RowAttribute): void { target.systemMaterial(uiMaterial.Material.empty); }
