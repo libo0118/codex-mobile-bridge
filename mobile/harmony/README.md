@@ -42,7 +42,7 @@ python -B scripts/build-mobile-harmony.py --prepare-only
 node --test mobile/tests/harmony-security.test.cjs mobile/tests/harmony-credentials.test.cjs
 ```
 
-`--prepare-only` 仅复制原项目图标和三个共享脚本，不代表 ArkTS 编译。脚本名与注入顺序固定为 `mobile-ui.js`、`mobile-clipboard.js`、`mobile-system-bars.js`。
+`--prepare-only` 仅复制 Harmony 专用的 `branding/app-1024.png` 图标和三个共享脚本，不代表 ArkTS 编译。脚本名与注入顺序固定为 `mobile-ui.js`、`mobile-clipboard.js`、`mobile-system-bars.js`。导航 SVG 直接使用已提交的原生资源，不从 iOS 覆写。
 
 安装工程要求的 HarmonyOS CLI 工具，设置 `HOS_SDK_HOME`，将 `ohpm`、`hvigorw` 加入 PATH 后：
 

@@ -8,7 +8,6 @@ on:
       - 'mobile/harmony/**'
       - 'mobile/shared/web/**'
       - 'mobile/tests/**'
-      - 'mobile/ios/BridgePreview/Assets.xcassets/AppIcon.appiconset/icon-1024.png'
       - 'scripts/build-mobile-harmony.py'
       - 'tests/test_mobile_harmony_build.py'
       - 'tests/host-environment.test.cjs'

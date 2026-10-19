@@ -60,9 +60,8 @@ struct Index {
   private serviceStore: ServiceStore = new ServiceStore();
   private configGeneration: number = 0;
   private codexTop: string = '#f5f5f3';
-  private codexBottom: string = '#f5f5f3';
 
-  aboutToAppear(): void { this.initialize(); }
+  aboutToAppear(): void { this.updateBars(this.codexTop); this.initialize(); }
   aboutToDisappear(): void { this.events.stop(); this.cancelDownload(); this.flushCookies(); }
 
   private async initialize(): Promise<void> {
@@ -124,9 +123,9 @@ struct Index {
     this.interaction = 0;
     this.closeServiceConfig();
     this.activeTab = id;
-    if (id === 'codex') { this.updateBars(this.codexTop, this.codexBottom); this.startEvents(); return; }
+    if (id === 'codex') { this.updateBars(this.codexTop); this.startEvents(); return; }
     this.events.stop();
-    this.updateBars('#f5f5f3', '#f5f5f3');
+    this.updateBars('#f5f5f3');
     const site = this.services.find((item: ServiceSite) => item.id === id);
     if (!site) return;
     if (!site.url) { this.configureService(site); return; }
@@ -233,8 +232,8 @@ struct Index {
     this.status = '';
     this.base = '';
     this.target = '';
-    this.codexTop = '#f5f5f3'; this.codexBottom = '#f5f5f3';
-    this.updateBars('#f5f5f3', '#f5f5f3');
+    this.codexTop = '#f5f5f3';
+    this.updateBars('#f5f5f3');
   }
 
   private async rename(computer: Computer): Promise<void> {
@@ -331,8 +330,8 @@ struct Index {
       try {
         const colors = JSON.parse(event.value) as BarColors;
         if (!new RegExp('^#[0-9a-fA-F]{6}$').test(colors.top) || !new RegExp('^#[0-9a-fA-F]{6}$').test(colors.bottom)) throw new Error('color');
-        this.codexTop = colors.top; this.codexBottom = colors.bottom;
-        this.updateBars(colors.top, colors.bottom);
+        this.codexTop = colors.top;
+        this.updateBars(colors.top);
         event.result.handlePromptConfirm('saved');
       } catch (_) { event.result.handleCancel(); }
     } else if (command === 'session' || command === 'logout') {
@@ -346,16 +345,40 @@ struct Index {
     return true;
   }
 
-  private updateBars(top: string, bottom: string): void {
+  private updateBars(top: string): void {
     window.getLastWindow(this.context).then((current: window.Window) => {
-      current.setWindowSystemBarProperties({ statusBarColor: top, navigationBarColor: bottom,
-        statusBarContentColor: this.barText(top), navigationBarContentColor: this.barText(bottom) }).catch(() => {});
+      current.setWindowSystemBarProperties({ statusBarColor: top, navigationBarColor: '#F0F4F0',
+        statusBarContentColor: this.barText(top), navigationBarContentColor: '#202124' }).catch(() => {});
     }).catch(() => {});
   }
 
   private barText(color: string): string {
     const red = parseInt(color.substring(1, 3), 16), green = parseInt(color.substring(3, 5), 16), blue = parseInt(color.substring(5, 7), 16);
     return red * 0.299 + green * 0.587 + blue * 0.114 > 150 ? '#202124' : '#ffffff';
+  }
+
+  private navigationIcon(id: string): Resource {
+    const selected = this.activeTab === id;
+    if (id === 'codex') return selected ? $r('app.media.nav_codex_selected') : $r('app.media.nav_codex');
+    if (id === 'keeper') return selected ? $r('app.media.nav_keeper_selected') : $r('app.media.nav_keeper');
+    if (id === 'cpa') return selected ? $r('app.media.nav_cpa_selected') : $r('app.media.nav_cpa');
+    return selected ? $r('app.media.nav_magpie_selected') : $r('app.media.nav_magpie');
+  }
+
+  @Builder
+  private navigationItem(id: string, label: string) {
+    Button({ type: ButtonType.Normal }) {
+      Column({ space: 5 }) {
+        Image(this.navigationIcon(id)).width(24).height(24).objectFit(ImageFit.Contain)
+          .draggable(false).accessibilityLevel('no')
+        Text(label).width('100%').fontSize(12).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textAlign(TextAlign.Center).fontWeight(this.activeTab === id ? FontWeight.Medium : FontWeight.Normal)
+          .fontColor(this.activeTab === id ? '#103F45' : '#526363')
+      }.width('100%').justifyContent(FlexAlign.Center)
+    }.layoutWeight(1).constraintSize({ minHeight: 64 }).padding({ left: 3, right: 3, top: 8, bottom: 8 })
+      .backgroundColor(this.activeTab === id ? '#FFFFFF' : Color.Transparent).borderRadius(10)
+      .accessibilityGroup(true).accessibilityText(label + (this.activeTab === id ? this.L('，已选中', ', selected') : ''))
+      .onClick(() => { this.selectTab(id); })
   }
 
   private async upload(event: OnShowFileSelectorEvent): Promise<void> {
@@ -569,11 +592,12 @@ struct Index {
         }
       }.width('100%').layoutWeight(1)
       Row({ space: 4 }) {
-        Button('Codex').layoutWeight(1).height(48).fontSize(14).fontColor(this.activeTab === 'codex' ? '#202124' : '#777b80').backgroundColor(this.activeTab === 'codex' ? '#ffffff' : Color.Transparent).borderRadius(12).onClick(() => { this.selectTab('codex'); })
+        this.navigationItem('codex', 'Codex')
         ForEach(this.services, (site: ServiceSite) => {
-          Button(site.name).layoutWeight(1).height(48).fontSize(14).fontColor(this.activeTab === site.id ? '#202124' : '#777b80').backgroundColor(this.activeTab === site.id ? '#ffffff' : Color.Transparent).borderRadius(12).onClick(() => { this.selectTab(site.id); })
+          this.navigationItem(site.id, site.name)
         }, (site: ServiceSite) => site.id)
-      }.padding({ left: 8, right: 8, top: 6, bottom: 6 }).width('100%').backgroundColor('#f5f5f3')
+      }.padding({ left: 8, right: 8, top: 6, bottom: 6 }).width('100%').backgroundColor('#F0F4F0')
+        .border({ width: { top: 1 }, color: '#DCE5DD' })
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
   }
 }

@@ -105,5 +105,5 @@ test('HarmonyOS prepares the shared scripts once in the same order as its packag
   assert.deepEqual([...loader.matchAll(/'(mobile-[^']+\.js)'/g)].map(([, name]) => name), shared);
   assert.match(loader, /await context\.resourceManager\.getRawFileContent\(name\)/);
   assert.match(builder, /resources \/ 'rawfile' \/ name/);
-  assert.match(builder, /ICON_SOURCE = Path\('mobile\/ios\/BridgePreview\/Assets\.xcassets\/AppIcon\.appiconset\/icon-1024\.png'\)/);
+  assert.match(builder, /ICON_SOURCE = PROJECT \/ 'branding\/app-1024\.png'/);
 });

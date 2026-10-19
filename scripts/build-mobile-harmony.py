@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import struct
 import subprocess
 import zipfile
 
@@ -14,7 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT = Path('mobile/harmony')
 SHARED_SCRIPTS = ('mobile-ui.js', 'mobile-clipboard.js', 'mobile-system-bars.js')
 BUNDLE_NAME = 'io.github.try2love.codexbridge.harmony'
-ICON_SOURCE = Path('mobile/ios/BridgePreview/Assets.xcassets/AppIcon.appiconset/icon-1024.png')
+ICON_SOURCE = PROJECT / 'branding/app-1024.png'
+NAV_ICONS = tuple('nav_' + name + suffix + '.svg'
+                  for name in ('codex', 'keeper', 'cpa', 'magpie') for suffix in ('', '_selected'))
 
 
 def read_json(path):
@@ -66,6 +69,14 @@ def verify_hap(hap, root, app):
         for name in SHARED_SCRIPTS:
             if archive.read('resources/rawfile/' + name) != (root / 'mobile/shared/web' / name).read_bytes():
                 raise RuntimeError('Packaged HarmonyOS shared resource differs from its source: ' + name)
+        media = 'resources/base/media/'
+        for name in ('app_icon.png',) + NAV_ICONS:
+            if media + name not in names or archive.getinfo(media + name).file_size == 0:
+                raise RuntimeError('Missing packaged HarmonyOS icon: ' + name)
+        # The resource compiler can optimize PNG bytes, but must retain the full-size launcher icon.
+        icon = archive.read(media + 'app_icon.png')
+        if len(icon) < 24 or icon[:8] != b'\x89PNG\r\n\x1a\n' or struct.unpack('>II', icon[16:24]) != (1024, 1024):
+            raise RuntimeError('Packaged HarmonyOS launcher icon must be a 1024px PNG.')
 
 
 def sdk_info():

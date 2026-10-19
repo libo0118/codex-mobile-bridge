@@ -24,7 +24,7 @@ class HarmonyBuildTests(unittest.TestCase):
             destination = project / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / BUILDER.PROJECT / relative, destination)
-        for relative in [Path('package.json'), BUILDER.ICON_SOURCE] + [Path('mobile/shared/web') / name for name in BUILDER.SHARED_SCRIPTS]:
+        for relative in [Path('package.json'), BUILDER.ICON_SOURCE] + [Path('mobile/shared/web') / name for name in BUILDER.SHARED_SCRIPTS] + [BUILDER.PROJECT / 'entry/src/main/resources/base/media' / name for name in BUILDER.NAV_ICONS]:
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / relative, destination)
@@ -38,6 +38,9 @@ class HarmonyBuildTests(unittest.TestCase):
         }
         entries.update(('resources/rawfile/' + name, (self.root / 'mobile/shared/web' / name).read_bytes())
                        for name in BUILDER.SHARED_SCRIPTS)
+        entries['resources/base/media/app_icon.png'] = (self.root / BUILDER.ICON_SOURCE).read_bytes()
+        entries.update(('resources/base/media/' + name, (self.root / BUILDER.PROJECT / 'entry/src/main/resources/base/media' / name).read_bytes())
+                       for name in BUILDER.NAV_ICONS)
         if missing:
             entries.pop(missing)
         if altered:
@@ -47,13 +50,24 @@ class HarmonyBuildTests(unittest.TestCase):
                 archive.writestr(name, value)
         return path
 
-    def test_prepare_copies_exact_shared_bytes_and_existing_icon_without_sdk(self):
+    def test_prepare_copies_exact_shared_bytes_and_harmony_icon_without_sdk(self):
+        ios = self.root / 'mobile/ios/BridgePreview/Assets.xcassets/AppIcon.appiconset/icon-1024.png'
+        ios.parent.mkdir(parents=True)
+        ios.write_bytes(b'Other platform icon must not overwrite Harmony branding')
         self.assertEqual(BUILDER.prepare_resources(self.root), self.app)
         self.assertEqual(BUILDER.prepare_resources(self.root), self.app)
         resources = self.root / BUILDER.PROJECT / 'entry/src/main/resources'
         for name in BUILDER.SHARED_SCRIPTS:
             self.assertEqual((resources / 'rawfile' / name).read_bytes(), (self.root / 'mobile/shared/web' / name).read_bytes())
         self.assertEqual((resources / 'base/media/app_icon.png').read_bytes(), (ROOT / BUILDER.ICON_SOURCE).read_bytes())
+        self.assertEqual((self.root / BUILDER.PROJECT / 'AppScope/resources/base/media/app_icon.png').read_bytes(), (ROOT / BUILDER.ICON_SOURCE).read_bytes())
+
+    def test_missing_or_invalid_packaged_branding_is_rejected(self):
+        for name in ('app_icon.png',) + BUILDER.NAV_ICONS:
+            with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, 'Missing packaged HarmonyOS icon'):
+                BUILDER.verify_hap(self.hap(missing='resources/base/media/' + name), self.root, self.app)
+        with self.assertRaisesRegex(RuntimeError, '1024px PNG'):
+            BUILDER.verify_hap(self.hap(altered={'resources/base/media/app_icon.png': b'not an icon'}), self.root, self.app)
 
     def test_version_mismatch_and_missing_source_fail_before_build(self):
         package = self.root / 'package.json'
