@@ -1,6 +1,6 @@
 # A 底栏 + C 图标
 
-用户于2026-10-19最终明确选择A的底栏样式，搭配C的四个菜单图标与App图标。桌面名称为 Codex。
+用户于2026-10-19最终明确选择A的底栏样式，搭配C的四个菜单图标与App图标。桌面名称为 Codex+。
 
 - `app.svg` 是原始全幅图；`app-background.svg` 与透明 `app-foreground.svg` 的组合与原图一致。
 - `app-1024.png` 是原始SVG的1024px实色栅格图，供构建脚本复制到AppScope与entry生成资源；不依赖iOS图标。
