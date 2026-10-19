@@ -98,7 +98,7 @@ class Auth:
     @staticmethod
     def mobile_client(user_agent):
         # Only selects lifetime AFTER authentication; this is not proof of identity.
-        return bool(re.search(r'(?:^|\s)BridgeMobile/[\w.-]+-(?:iOS|Android)(?:\s|$)', user_agent))
+        return bool(re.search(r'(?:^|\s)BridgeMobile/[\w.-]+-(?:iOS|Android|HarmonyOS)(?:\s|$)', user_agent))
 
     def __init__(self, config, data_dir=None):
         self.config = config

@@ -1,0 +1,77 @@
+name: HarmonyOS unsigned HAP
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [harmonyos, feat/harmonyos]
+    paths:
+      - 'mobile/harmony/**'
+      - 'mobile/shared/web/**'
+      - 'mobile/tests/**'
+      - 'mobile/ios/BridgePreview/Assets.xcassets/AppIcon.appiconset/icon-1024.png'
+      - 'scripts/build-mobile-harmony.py'
+      - 'tests/test_mobile_harmony_build.py'
+      - 'tests/host-environment.test.cjs'
+      - 'tests/test_pairing.py'
+      - 'tests/test_login_security.py'
+      - 'web/hosts/environment.js'
+      - 'bridge/features/auth/**'
+      - 'package.json'
+      - '.github/workflows/harmonyos.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harmonyos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HARMONY_CLI_TOOLS_VERSION: '26.0.0.821'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prepare original shared resources and run focused regression tests
+        run: |
+          python -B scripts/build-mobile-harmony.py --prepare-only
+          node --test tests/host-environment.test.cjs mobile/tests/*.test.cjs
+          python -B -m unittest discover -s tests -p test_mobile_harmony_build.py -v
+          python -B -m unittest discover -s tests -p test_pairing.py -v
+          python -B -m unittest discover -s tests -p test_login_security.py -v
+      # SDK mirror tag 26.0.0.821 points to 8b294a949bdf7191e1a7ffa878be748c9032983b.
+      # setup-ohos verifies the downloaded archive's published SHA-256 before extraction.
+      - name: Verify SDK mirror release reference
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          actual=$(gh api repos/ErBWs/ohos-sdk/git/ref/tags/26.0.0.821 --jq '.object.sha')
+          test "$actual" = '8b294a949bdf7191e1a7ffa878be748c9032983b'
+      - name: Set up pinned HarmonyOS CLI tools and bundled Node runtime
+        uses: ErBWs/setup-ohos@4dbb63025116eb6165ceac58a4bf47cbdc5ac721 # v2.0.0
+        with:
+          version: '26.0.0.821'
+          cache: 'true'
+      - name: Inspect installed build toolchain
+        run: |
+          node --version
+          ohpm --version
+          hvigorw --version
+      - name: Assemble and verify unsigned HAP
+        run: python -B scripts/build-mobile-harmony.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-HarmonyOS-unsigned
+          if-no-files-found: error
+          path: |
+            dist/mobile-harmony/*-HarmonyOS-unsigned.hap
+            dist/mobile-harmony/SHA256SUMS.txt
+            dist/mobile-harmony/build-info.json

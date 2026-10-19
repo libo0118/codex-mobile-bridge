@@ -1,0 +1,7 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "Connect to your Codex Mobile Bridge gateway" },
+    { "name": "EntryAbility_desc", "value": "Codex Mobile Bridge" },
+    { "name": "EntryAbility_label", "value": "Codex Mobile Bridge" }
+  ]
+}

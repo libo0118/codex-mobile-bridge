@@ -25,3 +25,18 @@ dist/
 /mobile/android-push/.gradle/
 /mobile/android-push/build/
 /mobile/android-push/local.properties
+
+# HarmonyOS SDK/cache, local signing and resources generated from shared sources
+/mobile/harmony/.hvigor/
+/mobile/harmony/.idea/
+/mobile/harmony/oh_modules/
+/mobile/harmony/entry/oh_modules/
+/mobile/harmony/entry/build/
+/mobile/harmony/build/
+/mobile/harmony/local.properties
+/mobile/harmony/*.p12
+/mobile/harmony/*.p7b
+/mobile/harmony/*.cer
+/mobile/harmony/AppScope/resources/base/media/app_icon.png
+/mobile/harmony/entry/src/main/resources/base/media/app_icon.png
+/mobile/harmony/entry/src/main/resources/rawfile/*.js

@@ -28,6 +28,7 @@
 | 浏览器与手机 App 的差别 | `web/hosts/` | `mobile/shared/web/` 共同注入脚本 |
 | Android 原生菜单、返回、下载、通知 | `mobile/android/` | 可选推送壳 `mobile/android-push/` |
 | iOS 原生菜单、导航、下载、通知 | `mobile/ios/` | Xcode 的 Sources/Resources 与 `WebScripts.swift` |
+| HarmonyOS 原生壳、ArkWeb、文件与前台通知 | `mobile/harmony/` | `scripts/build-mobile-harmony.py`、`.github/workflows/harmonyos.yml` |
 | 桌面网关页面与模块排布 | `desktop/shell/`、`desktop/features/` | `desktop/index.html`、`main.cjs`、`preload.cjs` |
 
 ## 目录与职责
@@ -50,12 +51,12 @@ bridge/
   resources.py                   源码/冻结运行时的资源定位
 web/                             Web 与手机共享聊天界面
   shell/ features/ shared/        共享功能与页面组织
-  hosts/                         browser / iOS / Android 宿主适配
+  hosts/                         browser / iOS / Android / HarmonyOS 宿主适配
   layouts/                       紧凑 / 中等 / 宽屏与容器分屏
 desktop/                         桌面网关外壳及功能页面
 mobile/
-  ios/ android/                  各平台原生壳、扫码、通知、下载
-  shared/web/                    两端共用、随 App 打包的注入脚本
+  ios/ android/ harmony/         各平台原生壳、扫码、通知、下载
+  shared/web/                    各端共用、随 App 打包的注入脚本
   android-push/                  Android 可选推送构建配置
 relay/                           独立中继服务及管理页面
 scripts/                         测试、构建、验证和受控烟测入口
@@ -131,6 +132,7 @@ flowchart TD
 “iOS/Android/浏览器”和“紧凑/中等/宽屏”是独立维度，不维护四份聊天业务代码。手机浏览器仍是浏览器宿主；平板和折叠屏中的 App 可以采用宽屏布局。页面尺寸改变时保留现有会话、草稿、标签、阅读位置和用户分屏选择。
 
 - 修改仅 iOS 的行为：从 `mobile/ios/AGENTS.md` 开始；Android 同理。
+- 修改 HarmonyOS 的行为：从 `mobile/harmony/README.md` 开始；工程配置与原生编译独立，聊天业务和网关协议继续共享。
 - 修改两端共同的原生菜单让位或剪贴板脚本：从 `mobile/shared/AGENTS.md` 开始；源码只存一份，两端构建清单都引用它。
 - 修改窄屏/宽屏排布：从 `web/layouts/README.md` 开始；不能靠宿主或设备型号判断可用空间。
 - 修改浏览器/App 的功能入口差异：从 `web/hosts/README.md` 开始；宿主提示不提供原生权限。

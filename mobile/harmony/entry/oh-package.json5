@@ -1,0 +1,6 @@
+{
+  "name": "entry",
+  "version": "2.1.1",
+  "description": "Codex Mobile Bridge entry module",
+  "dependencies": {}
+}

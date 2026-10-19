@@ -1,4 +1,4 @@
-# Android 与 iOS App
+# Android、iOS 与 HarmonyOS App
 
 手机扫描网关二维码后连接 Codex、Claude Desktop 和 DeepSeek Harness，电脑继续执行任务。手机 App 保存多台电脑，提供原生扫码、剪贴板、文件下载和通知；浏览器入口同时保留。
 
@@ -32,6 +32,7 @@
 
 - **Android 8.0 及以上**：从 Release 下载 `Codex-Mobile-Bridge-2.1.1-Android.apk`，按系统提示安装。升级时覆盖安装，不要先卸载，以保留电脑列表和登录。相机权限仅供扫码，拒绝后仍可粘贴地址登录。
 - **iPhone / iPad**：Release 提供未签名 IPA 和 Xcode 源码包，需使用自己的 Apple 账号签名；不能直接点击 IPA 安装，暂无 App Store / TestFlight 分发。免费签名可能需要定期重新安装。
+- **HarmonyOS 5.0.2（API 14）及以上**：新增原生 ArkTS + ArkWeb 工程，开发分支通过 GitHub Actions 的 `HarmonyOS unsigned HAP` 工作流生成未签名 HAP、SHA-256 和构建来源记录。HAP 需用自己的开发者证书及设备授权签名后安装；当前不提供应用市场分发或自动更新。能力与验证边界见 [HarmonyOS 说明](harmony/README.md)。
 - 使用 Release 中的 `SHA256SUMS.txt` 校验下载。编译通过不代表已验证所有机型、系统版本和网络环境。
 
 首次从较旧版本升级到 v2.1.1，可先下载 APK 覆盖安装；新版 Android 再次更新时可直接使用以下应用内流程。
@@ -155,10 +156,12 @@ macOS/Linux 使用登录 shell 与 PTY；Windows 10 1809 及以上使用 ConPTY 
 
 [源码对照表](source-map.json) · [Android 规则](android/AGENTS.md) · [iOS 规则](ios/AGENTS.md) · [共享脚本](shared/AGENTS.md)
 
-两端共用的页面适配、剪贴板等在 `shared/web/` 保留单一源码，原生平台分开维护。源码资源回归使用 `node --test mobile/tests/*.test.cjs`，不会运行原生编译器。
+各端共用的页面适配、剪贴板等在 `shared/web/` 保留单一源码，原生平台分开维护。源码资源回归使用 `node --test mobile/tests/*.test.cjs`，不会运行原生编译器。
 
 Android 入口是 `scripts/build-mobile-android.py`，使用项目 `.tmp/mobile-tools` 中已准备的 JDK、SDK 和 ZXing；发布必须保留既有签名，不能以新建密钥替代升级验证。地址边界验证见 `scripts/test-mobile-urls.py`，会话验证见 `scripts/test-mobile-session.py`，通知事件见 `tests/test_mobile_events.py`。
 
 iOS 构建入口 `scripts/build-mobile-ios.py` 生成未签名 IPA 和包含受版本管理源码的 Xcode ZIP；`--source-only` 只导出源码，无需 Xcode。脚本不会自动安装模拟器运行时；模拟器 SDK 编译与实际启动测试应分别记录。
+
+HarmonyOS 构建入口 `scripts/build-mobile-harmony.py` 使用已安装的 HarmonyOS SDK、`ohpm` 和 `hvigorw`，先准备共享资源，再执行原生编译并校验 HAP 内的模块、ArkTS 字节码和共享脚本。`--prepare-only` 只准备资源，无需 SDK；生成文件和工具缓存不提交。Actions 使用固定版本的 CLI 工具镜像并校验下载摘要；产物位于 `dist/mobile-harmony/`，构建不使用签名秘密、不自动发布 Release。编译及签名安装、扫码/文件/通知实机验证应分别记录。
 
 可选 APNs/FCM 接入见 [推送开发说明](push/README.md)。普通 APK 不含 Firebase SDK；没有配置自有推送服务和签名时，源码能力不等于远程推送可用。iOS 远程通知图片由 BridgeNotifications 扩展处理，需一同构建和签名。第三方许可见 [NOTICE.md](NOTICE.md)。

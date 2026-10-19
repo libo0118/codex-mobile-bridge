@@ -18,6 +18,8 @@ test('native identity preserves the existing user-agent token grammar', () => {
   for (const [ua, kind] of [
     ['Mozilla/5.0 BridgeMobile/0.1-iOS', 'ios'],
     ['Mozilla/5.0 BridgeMobile/0.1-Android', 'android'],
+    ['Mozilla/5.0 BridgeMobile/2.1.1-HarmonyOS', 'harmony'],
+    ['BridgeMobile/2.1.1-HarmonyOS BridgeMobile/2.1.1-Android', 'harmony'],
     ['BridgeMobile/2.0.0-preview.3-iOS Safari/605.1.15', 'ios'],
     ['BridgeMobile/build_42-Android\tOther/1', 'android'],
     ['prefixBridgeMobile/0.1-iOS', 'ios'],
@@ -25,6 +27,8 @@ test('native identity preserves the existing user-agent token grammar', () => {
     ['BridgeMobile/0.1-ios', 'browser'],
     ['bridgemobile/0.1-iOS', 'browser'],
     ['BridgeMobile/0.1-AndroidExtra', 'browser'],
+    ['BridgeMobile/2.1.1-HarmonyOSExtra', 'browser'],
+    ['BridgeMobile/2.1.1-harmonyos', 'browser'],
     ['BridgeMobile/0.1-iOS;', 'browser'],
     ['BridgeMobile/0.1-iOS/', 'browser'],
     ['BridgeMobile/0.1-Windows', 'browser'],
@@ -67,7 +71,7 @@ test('native appearance never changes a browser into a native host', () => {
 });
 
 test('host identity and native appearance do not depend on viewport or pointer policy', () => {
-  for (const [ua, kind] of [['Mozilla/5.0', 'browser'], ['BridgeMobile/0.1-iOS', 'ios'], ['BridgeMobile/0.1-Android', 'android']]) {
+  for (const [ua, kind] of [['Mozilla/5.0', 'browser'], ['BridgeMobile/0.1-iOS', 'ios'], ['BridgeMobile/0.1-Android', 'android'], ['BridgeMobile/2.1.1-HarmonyOS', 'harmony']]) {
     const {host, context, classes} = fixture(ua);
     context.matchMedia = () => { throw Error('host detection must not query layout'); };
     for (const width of [360, 720, 721, 1440]) {

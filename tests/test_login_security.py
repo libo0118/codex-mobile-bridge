@@ -69,7 +69,8 @@ class LoginSecurityTests(unittest.TestCase):
         self.assertEqual(self.auth.auto_blocks[IP]['attempts'], 5)
 
     def test_mobile_login_is_trusted_but_still_requires_password_and_revocation(self):
-        for agent in ('BridgeMobile/0.1-iOS', 'BridgeMobile/0.1-Android'):
+        for agent in ('BridgeMobile/0.1-iOS', 'BridgeMobile/0.1-Android', 'BridgeMobile/2.1.1-HarmonyOS',
+                      'BridgeMobile/2.1.1-HarmonyOS BridgeMobile/2.1.1-Android'):
             with self.assertRaises(LoginRejected):
                 self.auth.login('tester', 'wrong', IP, agent)
             token, row = self.auth.login('tester', 'correct-password', IP, agent, remember=False)
@@ -79,6 +80,19 @@ class LoginSecurityTests(unittest.TestCase):
                 self.assertIsNotNone(Auth(CONFIG, self.directory).get(token))
             self.auth.manage({'action': 'revoke', 'id': self.auth.key(token)})
             self.assertIsNone(Auth(CONFIG, self.directory).get(token))
+
+    def test_harmony_user_agent_never_authenticates_or_extends_a_browser_session_by_itself(self):
+        agent = 'BridgeMobile/2.1.1-HarmonyOS'
+        self.assertTrue(Auth.mobile_client(agent))
+        for invalid in ('BridgeMobile/2.1.1-HarmonyOSExtra', 'BridgeMobile/2.1.1-harmonyos',
+                        'prefixBridgeMobile/2.1.1-HarmonyOS'):
+            self.assertFalse(Auth.mobile_client(invalid))
+        client = {'ip': IP, 'peer': IP, 'source': 'direct'}
+        self.assertIsNone(self.auth.get('unauthenticated', client, agent))
+        with patch('bridge.features.auth.auth.time.time', return_value=1000):
+            token, row = self.auth.new_session(IP)
+        with patch('bridge.features.auth.auth.time.time', return_value=row['expires'] + 1):
+            self.assertIsNone(self.auth.get(token, client, agent))
 
     def test_remembered_browser_renews_on_use_and_expires_after_inactivity(self):
         with patch('bridge.features.auth.auth.time.time', return_value=1000):

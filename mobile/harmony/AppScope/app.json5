@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "io.github.try2love.codexbridge.harmony",
+    "vendor": "try2love",
+    "versionCode": 33,
+    "versionName": "2.1.1",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

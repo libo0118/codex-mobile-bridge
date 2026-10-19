@@ -95,3 +95,15 @@ test('native apps package the three original client icons from the shared web so
  assert.match(build,/archive.write\(ROOT\/'web\/client-icons'\/f'\{provider\}.png', 'assets\/'\+provider\+'.png'\)/);
  assert.ok(gradle.includes('../../web/client-icons'));
 });
+
+test('HarmonyOS prepares the shared scripts once in the same order as its packaged-resource loader', () => {
+  const builder = read('scripts/build-mobile-harmony.py');
+  const inputs = builder.match(/SHARED_SCRIPTS = \(([^\n]+)\)/);
+  assert.ok(inputs);
+  assert.deepEqual([...inputs[1].matchAll(/'([^']+\.js)'/g)].map(([, name]) => name), shared);
+  const loader = read('mobile/harmony/entry/src/main/ets/web/WebScripts.ets');
+  assert.deepEqual([...loader.matchAll(/'(mobile-[^']+\.js)'/g)].map(([, name]) => name), shared);
+  assert.match(loader, /await context\.resourceManager\.getRawFileContent\(name\)/);
+  assert.match(builder, /resources \/ 'rawfile' \/ name/);
+  assert.match(builder, /ICON_SOURCE = Path\('mobile\/ios\/BridgePreview\/Assets\.xcassets\/AppIcon\.appiconset\/icon-1024\.png'\)/);
+});

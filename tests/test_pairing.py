@@ -136,7 +136,7 @@ class PairingHTTPTests(unittest.TestCase):
     def test_mobile_qr_login_survives_time_restart_and_missing_background_ua(self):
         # Exercise actual issuance, HTTP redemption and cookie renewal. Only
         # the isolated server clock advances; no real device/account is used.
-        for platform in ('Android', 'iOS'):
+        for platform in ('Android', 'iOS', 'HarmonyOS', 'HarmonyOS BridgeMobile/2.1.1-Android'):
             for origin, host in ((ORIGIN, '192.0.2.1:8787'), ('https://example.com', 'example.com')):
                 with self.subTest(platform=platform, origin=origin), tempfile.TemporaryDirectory(dir=ROOT/'.tmp') as directory:
                     self.server.auth = Auth(self.password, directory)
