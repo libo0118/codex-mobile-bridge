@@ -347,7 +347,7 @@ struct Index {
 
   private updateBars(top: string): void {
     window.getLastWindow(this.context).then((current: window.Window) => {
-      current.setWindowSystemBarProperties({ statusBarColor: top, navigationBarColor: '#F0F4F0',
+      current.setWindowSystemBarProperties({ statusBarColor: top, navigationBarColor: '#f5f5f3',
         statusBarContentColor: this.barText(top), navigationBarContentColor: '#202124' }).catch(() => {});
     }).catch(() => {});
   }
@@ -368,15 +368,15 @@ struct Index {
   @Builder
   private navigationItem(id: string, label: string) {
     Button({ type: ButtonType.Normal }) {
-      Column({ space: 5 }) {
+      Column({ space: 4 }) {
         Image(this.navigationIcon(id)).width(24).height(24).objectFit(ImageFit.Contain)
           .draggable(false).accessibilityLevel('no')
         Text(label).width('100%').fontSize(12).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .textAlign(TextAlign.Center).fontWeight(this.activeTab === id ? FontWeight.Medium : FontWeight.Normal)
-          .fontColor(this.activeTab === id ? '#103F45' : '#526363')
+          .fontColor(this.activeTab === id ? '#0A59F7' : '#303640')
       }.width('100%').justifyContent(FlexAlign.Center)
-    }.layoutWeight(1).constraintSize({ minHeight: 64 }).padding({ left: 3, right: 3, top: 8, bottom: 8 })
-      .backgroundColor(this.activeTab === id ? '#FFFFFF' : Color.Transparent).borderRadius(10)
+    }.layoutWeight(1).constraintSize({ minHeight: 60 }).padding({ left: 3, right: 3, top: 8, bottom: 8 })
+      .backgroundColor(Color.Transparent).borderRadius(30)
       .accessibilityGroup(true).accessibilityText(label + (this.activeTab === id ? this.L('，已选中', ', selected') : ''))
       .onClick(() => { this.selectTab(id); })
   }
@@ -591,13 +591,19 @@ struct Index {
           }.alignItems(HorizontalAlign.Start).padding(24).width('100%').height('100%').backgroundColor('#f5f5f3')
         }
       }.width('100%').layoutWeight(1)
-      Row({ space: 4 }) {
-        this.navigationItem('codex', 'Codex')
-        ForEach(this.services, (site: ServiceSite) => {
-          this.navigationItem(site.id, site.name)
-        }, (site: ServiceSite) => site.id)
-      }.padding({ left: 8, right: 8, top: 6, bottom: 6 }).width('100%').backgroundColor('#F0F4F0')
-        .border({ width: { top: 1 }, color: '#DCE5DD' })
+      Row() {
+        Row({ space: 2 }) {
+          this.navigationItem('codex', 'Codex')
+          ForEach(this.services, (site: ServiceSite) => {
+            this.navigationItem(site.id, site.name)
+          }, (site: ServiceSite) => site.id)
+        }.padding({ left: 6, right: 6, top: 5, bottom: 5 }).width('90%').constraintSize({ maxWidth: 380 })
+          .borderRadius(999)
+          .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR, { colorMode: ThemeColorMode.LIGHT,
+            policy: BlurStyleActivePolicy.FOLLOWS_WINDOW_ACTIVE_STATE, inactiveColor: '#F2F5F8' })
+          .border({ width: 1, color: '#E6FFFFFF' })
+          .shadow({ radius: 20, color: '#1A203047', offsetX: 0, offsetY: 7 })
+      }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 12 })
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
   }
 }
