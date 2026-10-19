@@ -27,6 +27,7 @@ dist/
 /mobile/android-push/local.properties
 
 # HarmonyOS SDK/cache, local signing and resources generated from shared sources
+/.hvigor/
 /mobile/harmony/.hvigor/
 /mobile/harmony/.idea/
 /mobile/harmony/oh_modules/
