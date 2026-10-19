@@ -164,22 +164,27 @@ class PairingHTTPTests(unittest.TestCase):
                     self.assertFalse(self.request('/api/auth', origin=origin, host=host, cookie=cookie, user_agent=ua)[1]['authenticated'])
                     self.assertFalse(self.request('/api/auth', origin=origin, host=host, user_agent=ua)[1]['authenticated'])
 
-    def test_legacy_mobile_cookie_upgrades_only_while_still_valid(self):
+    def test_legacy_trusted_mobile_cookie_upgrades_only_while_still_valid(self):
         with tempfile.TemporaryDirectory(dir=ROOT/'.tmp') as directory:
             self.server.auth = Auth(self.password, directory)
-            token, session = self.server.auth.new_session('127.0.0.1', 'Legacy mobile browser')
-            cookie = Auth.COOKIE + '=' + token
             ua = 'Mozilla/5.0 BridgeMobile/0.1-Android'
+            token, session = self.server.auth.login('test', 'test-password-long', '127.0.0.1', ua)
+            # Keep the server-issued trusted marker while emulating an old finite cookie.
+            session['expires'] = session['created'] + 12 * 3600
+            self.server.auth.persist()
+            cookie = Auth.COOKIE + '=' + token
             with patch('bridge.features.auth.auth.time.time', return_value=session['created'] + 11 * 3600):
                 self.server.auth = Auth(self.password, directory)
-                _, value, refreshed = self.request('/api/auth', cookie=cookie, user_agent=ua)
+                _, value, refreshed = self.request('/api/auth', cookie=cookie)
                 self.assertTrue(value['trustedDevice'])
                 self.assertIn('Max-Age=34560000', refreshed)
             with patch('bridge.features.auth.auth.time.time', return_value=session['created'] + 401 * 86400):
                 self.server.auth = Auth(self.password, directory)
                 self.assertTrue(self.request('/api/auth', cookie=cookie, user_agent=ua)[1]['authenticated'])
 
-            expired, row = self.server.auth.new_session('127.0.0.1', 'Legacy mobile browser')
+            expired, row = self.server.auth.login('test', 'test-password-long', '127.0.0.1', ua)
+            row['expires'] = row['created'] + 12 * 3600
+            self.server.auth.persist()
             with patch('bridge.features.auth.auth.time.time', return_value=row['expires'] + 1):
                 self.assertFalse(self.request('/api/auth', cookie=Auth.COOKIE+'='+expired, user_agent=ua)[1]['authenticated'])
 

@@ -88,7 +88,7 @@ export class AttachmentDownload {
     } catch (error) {
       if (openFile) { try { await fs.close(openFile); } catch (_) {} }
       try { fs.unlinkSync(this.temp); } catch (_) {}
-      throw error;
+      throw new Error((error as Error).message || '下载失败，请重试');
     } finally {
       controller.runJavaScript(downloadClearScript(this.slot)).catch(() => {});
     }
@@ -96,24 +96,28 @@ export class AttachmentDownload {
 }
 
 export async function saveAttachment(context: common.UIAbilityContext, file: DownloadFile): Promise<boolean> {
-  const documentPicker = new picker.DocumentViewPicker(context);
-  const destinations = await documentPicker.save({ newFileNames: [file.name] });
-  if (!destinations.length) return false;
   let source: fs.File | undefined;
   let destination: fs.File | undefined;
   try {
+    if (!file.path.startsWith(context.cacheDir + '/bridge-attachment-') || !Number.isInteger(file.size) || file.size < 0 || file.size > DOWNLOAD_LIMIT) {
+      throw new Error('下载缓存无效，请重新下载');
+    }
     source = await fs.open(file.path, fs.OpenMode.READ_ONLY);
-    destination = await fs.open(destinations[0], fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC);
-    await fs.copyFile(source.fd, destination.fd);
+    if ((await fs.stat(source.fd)).size !== file.size) throw new Error('下载缓存不完整，请重新下载');
+    const documentPicker = new picker.DocumentViewPicker(context);
+    const destinations = await documentPicker.save({ newFileNames: [file.name] });
+    if (!destinations.length) return false;
+    if (destinations.length !== 1 || !destinations[0].startsWith('file://')) throw new Error('请从系统文件选择器重新选择保存位置');
+    destination = await fs.open(destinations[0], fs.OpenMode.READ_WRITE);
+    if ((await fs.stat(destination.fd)).size !== 0) throw new Error('所选文件已有内容，未覆盖。请换一个文件名保存。');
+    try {
+      await fs.copyFile(source.fd, destination.fd);
+      if ((await fs.stat(destination.fd)).size !== file.size) throw new Error('incomplete');
+    } catch (_) { throw new Error('保存未完成，目标可能留有不完整文件；请检查后换名保存。'); }
     return true;
-  } catch (error) {
-    // A failed copy must not leave a partially written attachment looking successful.
-    if (destination) { try { await fs.close(destination); } catch (_) {} destination = undefined; }
-    try { await fs.unlink(destinations[0]); } catch (_) {}
-    throw error;
   } finally {
-    if (source) await fs.close(source);
-    if (destination) await fs.close(destination);
+    try { if (destination) await fs.close(destination); }
+    finally { if (source) await fs.close(source); }
   }
 }
 

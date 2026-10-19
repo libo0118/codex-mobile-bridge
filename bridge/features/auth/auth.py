@@ -277,7 +277,8 @@ class Auth:
             if session and self.valid(session):
                 if client:
                     now = time.time()
-                    upgrade = self.mobile_client(user_agent) and not session.get('trustedDevice')
+                    # Request UA is mutable; only a server-issued trusted marker permits migration.
+                    upgrade = session.get('trustedDevice') is True and session['expires'] != 0
                     # Migrate previously issued seven-day cookies while they are valid.
                     remembered = session.get('remembered', session.get('persistent', True) and
                                              session['expires'] - session['created'] == self.REMEMBER_HOURS * 3600)

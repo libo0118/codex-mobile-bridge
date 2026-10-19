@@ -44,6 +44,7 @@ struct Index {
   @State configId: string = '';
   @State serviceName: string = '';
   @State serviceAddress: string = '';
+  @State savingServices: string[] = [];
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   private store: ComputerStore = new ComputerStore();
   private controller: webview.WebviewController = new webview.WebviewController();
@@ -57,6 +58,7 @@ struct Index {
   private downloaded?: DownloadFile;
   private events: ForegroundEvents = new ForegroundEvents();
   private serviceStore: ServiceStore = new ServiceStore();
+  private configGeneration: number = 0;
   private codexTop: string = '#f5f5f3';
   private codexBottom: string = '#f5f5f3';
 
@@ -99,10 +101,10 @@ struct Index {
         if (target !== computer.base + '/') {
           const prefix = computer.base + '/#';
           if (!target.startsWith(prefix)) return;
-          const fragment = target.substring(prefix.length()).split('~');
+          const fragment = target.substring(prefix.length).split('~');
           if (fragment.length !== 2 || chatURL(computer.base, decodeURIComponent(fragment[0]), decodeURIComponent(fragment[1])) !== target) return;
         }
-        this.activeTab = 'codex'; this.configId = '';
+        this.activeTab = 'codex'; this.closeServiceConfig();
         if (this.connected && this.base === computer.base) this.controller.loadUrl(target);
         else this.connect(target, computer.base);
       } catch (_) {}
@@ -120,7 +122,7 @@ struct Index {
 
   private selectTab(id: string): void {
     this.interaction = 0;
-    this.configId = '';
+    this.closeServiceConfig();
     this.activeTab = id;
     if (id === 'codex') { this.updateBars(this.codexTop, this.codexBottom); this.startEvents(); return; }
     this.events.stop();
@@ -132,19 +134,27 @@ struct Index {
   }
 
   private configureService(site: ServiceSite): void {
+    this.configGeneration++;
     this.configId = site.id; this.serviceName = site.name; this.serviceAddress = site.url;
   }
 
+  private closeServiceConfig(): void { this.configGeneration++; this.configId = ''; }
+
   private async saveService(): Promise<void> {
-    const id = this.configId;
-    if (id === 'keeper') { this.configId = ''; return; }
+    const id = this.configId, address = this.serviceAddress, name = this.serviceName, ticket = this.configGeneration;
+    if (!id || this.savingServices.includes(id)) return;
+    if (id === 'keeper') { this.closeServiceConfig(); return; }
+    this.savingServices = this.savingServices.concat([id]);
     try {
-      const site = new ServiceSite(id, this.serviceName || (id === 'cpa' ? 'CPA' : 'Magpie'), this.serviceAddress);
+      const site = new ServiceSite(id, name || (id === 'cpa' ? 'CPA' : 'Magpie'), address);
       await this.serviceStore.save(site);
       this.services = this.services.map((item: ServiceSite) => item.id === id ? site : item);
       this.loadedServices = this.loadedServices.filter((item: ServiceSite) => item.id !== id).concat([site]);
-      this.configId = '';
-    } catch (error) { this.error(error as Error); }
+      if (ticket === this.configGeneration && id === this.configId && address === this.serviceAddress && name === this.serviceName) this.closeServiceConfig();
+    } catch (error) {
+      if (ticket === this.configGeneration && id === this.configId) this.error(error as Error);
+      else promptAction.showToast({ message: this.L('站点设置保存失败，请返回设置重试。', 'Site settings were not saved. Return to settings and retry.') });
+    } finally { this.savingServices = this.savingServices.filter((item: string) => item !== id); }
   }
 
   private async toggleAlerts(): Promise<void> {
@@ -405,7 +415,7 @@ struct Index {
         this.cancelDownload();
         promptAction.showToast({ message: this.L('文件已保存', 'File saved') });
       }
-    } catch (_) { this.message(this.L('保存失败，请重试。', 'Save failed. Please try again.')); }
+    } catch (error) { this.error(error as Error); }
     finally { this.downloadBusy = false; }
   }
 
@@ -414,7 +424,7 @@ struct Index {
   }
 
   onBackPress(): boolean {
-    if (this.configId) { this.configId = ''; return true; }
+    if (this.configId) { if (!this.savingServices.includes(this.configId)) this.closeServiceConfig(); return true; }
     if (this.activeTab !== 'codex') { this.selectTab('codex'); return true; }
     if (!this.connected) return false;
     const ticket = this.generation;
@@ -550,11 +560,11 @@ struct Index {
             Text(this.configId === 'keeper' ? 'Keeper' : '配置管理站点').fontSize(23).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%')
             Text(this.configId === 'keeper' ? 'Keeper 使用固定地址。登录信息可在网页工具栏中保存；你在应用内自行输入。' : '填写真实 HTTPS 地址。保存后首次加载；之后切换页签保留网页。修改地址会重新加载此站点。')
               .fontSize(14).fontColor('#777b80').width('100%')
-            TextInput({ text: this.serviceName, placeholder: '站点名称' }).maxLength(16).enabled(this.configId !== 'keeper').onChange((value: string) => { this.serviceName = value; })
-            TextInput({ text: this.serviceAddress, placeholder: 'https://' }).type(InputType.URL).maxLength(4096).enabled(this.configId !== 'keeper').onChange((value: string) => { this.serviceAddress = value; })
+            TextInput({ text: this.serviceName, placeholder: '站点名称' }).maxLength(16).enabled(this.configId !== 'keeper' && !this.savingServices.includes(this.configId)).onChange((value: string) => { this.serviceName = value; })
+            TextInput({ text: this.serviceAddress, placeholder: 'https://' }).type(InputType.URL).maxLength(4096).enabled(this.configId !== 'keeper' && !this.savingServices.includes(this.configId)).onChange((value: string) => { this.serviceAddress = value; })
             Text('请勿在地址中包含用户名、密码或访问令牌。登录后 Cookie 由系统网页组件保存。').fontSize(13).fontColor('#777b80').width('100%')
-            Button(this.configId === 'keeper' ? '返回网页' : '保存并打开').width('100%').height(54).backgroundColor('#202124').fontColor('#ffffff').onClick(() => { this.saveService(); })
-            Button('取消').width('100%').height(48).backgroundColor('#f4f5f7').fontColor('#202124').onClick(() => { this.configId = ''; this.selectTab('codex'); })
+            Button(this.savingServices.includes(this.configId) ? '保存中…' : (this.configId === 'keeper' ? '返回网页' : '保存并打开')).width('100%').height(54).backgroundColor('#202124').fontColor('#ffffff').enabled(!this.savingServices.includes(this.configId)).onClick(() => { this.saveService(); })
+            Button('取消').width('100%').height(48).backgroundColor('#f4f5f7').fontColor('#202124').enabled(!this.savingServices.includes(this.configId)).onClick(() => { this.selectTab('codex'); })
           }.alignItems(HorizontalAlign.Start).padding(24).width('100%').height('100%').backgroundColor('#f5f5f3')
         }
       }.width('100%').layoutWeight(1)

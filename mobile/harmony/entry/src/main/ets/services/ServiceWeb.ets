@@ -30,7 +30,7 @@ export struct ServiceWeb {
     if (!request.isMainFrame()) return false;
     if (this.allowed(target)) return false;
     if (request.isRequestGesture() && this.active && externalHTTP(target)) {
-      AlertDialog.show({ title: '在浏览器打开外部链接？', message: target.substring(0, 1024),
+      AlertDialog.show({ title: '在浏览器打开外部链接？', message: target.split(new RegExp('[?#]'))[0].substring(0, 1024),
         primaryButton: { value: '取消', action: () => {} },
         secondaryButton: { value: '打开', action: () => {
           this.context.startAbility({ action: 'ohos.want.action.viewData', uri: target, entities: ['entity.system.browsable'] }).catch(() => {});
@@ -38,6 +38,19 @@ export struct ServiceWeb {
       });
     }
     return true;
+  }
+
+  private back(): void {
+    if (!this.active) return;
+    try { if (this.controller.accessBackward()) this.controller.backward(); } catch (_) {}
+  }
+
+  @Builder
+  private pageMenu() {
+    Menu() {
+      MenuItem({ content: '刷新页面' }).onClick(() => { if (this.active) this.controller.refresh(); })
+      MenuItem({ content: '站点设置' }).onClick(() => { if (this.active) this.onConfigure(); })
+    }
   }
 
   private async fill(username: string, secret: string, scope: string, kind: CredentialKind): Promise<void> {
@@ -64,10 +77,12 @@ export struct ServiceWeb {
     Column() {
       Row({ space: 8 }) {
         Text(this.site.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Button('返回').height(44).fontSize(14).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active).onClick(() => { this.back(); })
         ServiceCredentials({ serviceId: this.site.id, configuredUrl: this.site.url, currentUrl: this.currentURL, active: this.active,
           onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => { this.fill(username, secret, scope, kind); } })
-        Button('刷新').height(44).fontSize(14).backgroundColor('#f4f5f7').fontColor('#202124').onClick(() => { this.controller.refresh(); })
-        Button('站点设置').height(44).fontSize(14).backgroundColor('#f4f5f7').fontColor('#202124').onClick(() => { this.onConfigure(); })
+        Button('•••').width(44).height(44).fontSize(17).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active)
+          .accessibilityText('页面选项').bindMenu(this.pageMenu)
       }.height(56).padding({ left: 16, right: 12 }).width('100%').backgroundColor('#f5f5f3')
       if (this.status) { Text(this.status).fontSize(12).fontColor('#777b80').padding(6).width('100%') }
       Web({ src: this.initialURL, controller: this.controller })

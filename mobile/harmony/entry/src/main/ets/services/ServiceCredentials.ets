@@ -33,8 +33,11 @@ export struct ServiceCredentials {
   }
 
   private valid(ticket: number, id: string, configured: string, current: string, scope: string): boolean {
-    return this.active && this.open && ticket === this.generation && id === this.serviceId && configured === this.configuredUrl &&
-      current === this.currentUrl && credentialScopeMatches(this.currentUrl, scope, this.configuredUrl);
+    return this.samePanel(ticket, id, configured, current) && credentialScopeMatches(this.currentUrl, scope, this.configuredUrl);
+  }
+
+  private samePanel(ticket: number, id: string, configured: string, current: string): boolean {
+    return this.active && this.open && ticket === this.generation && id === this.serviceId && configured === this.configuredUrl && current === this.currentUrl;
   }
 
   private async show(): Promise<void> {
@@ -47,7 +50,7 @@ export struct ServiceCredentials {
       if (!this.valid(ticket, id, configured, current, scope)) { this.feedback = '当前页面不在此站点的登录范围内。'; return; }
       const saved = await this.vault.has(this.context, id, scope);
       if (this.valid(ticket, id, configured, current, scope)) this.saved = saved;
-    } catch (_) { this.feedback = '无法读取安全存储状态。'; }
+    } catch (_) { if (this.samePanel(ticket, id, configured, current)) this.feedback = '无法读取安全存储状态，可忘记该站点登录信息后重新保存。'; }
   }
 
   private async save(): Promise<void> {
@@ -85,10 +88,10 @@ export struct ServiceCredentials {
     const ticket = this.generation, id = this.serviceId, configured = this.configuredUrl, current = this.currentUrl;
     try {
       const scope = credentialScope(configured);
-      if (!this.valid(ticket, id, configured, current, scope) || this.busy) return;
+      if (!this.samePanel(ticket, id, configured, current) || this.busy) return;
       this.busy = true;
       await this.vault.remove(this.context, id, scope);
-      if (this.valid(ticket, id, configured, current, scope)) { this.saved = false; this.feedback = '已删除本机保存的登录信息。'; }
+      if (this.samePanel(ticket, id, configured, current)) { this.saved = false; this.feedback = '已删除该站点本机保存的登录信息，包括更改地址前的记录。'; }
     } catch (_) { if (ticket === this.generation) this.feedback = '删除失败，请重试。'; }
     finally { if (ticket === this.generation) { this.secret = ''; this.username = ''; this.busy = false; } }
   }
@@ -111,8 +114,8 @@ export struct ServiceCredentials {
       Button('安全保存').width('100%').height(48).backgroundColor('#202124').fontColor('#ffffff').enabled(!this.busy && !!this.secret).onClick(() => { this.save(); })
       if (this.saved) {
         Button(this.kind === 'entry-link' ? '打开安全入口' : '填入已保存').width('100%').height(48).backgroundColor('#f4f5f7').fontColor('#202124').enabled(!this.busy).onClick(() => { this.fillSaved(); })
-        Button('删除已保存').width('100%').height(44).backgroundColor(Color.Transparent).fontColor('#b44235').enabled(!this.busy).onClick(() => { this.remove(); })
       }
+      Button('忘记该站点登录信息').width('100%').height(44).backgroundColor(Color.Transparent).fontColor('#b44235').enabled(!this.busy).onClick(() => { this.remove(); })
       Button('关闭').width('100%').height(44).backgroundColor(Color.Transparent).fontColor('#777b80').onClick(() => { this.open = false; })
     }.padding(24).width('100%').backgroundColor('#ffffff').alignItems(HorizontalAlign.Start)
   }

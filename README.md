@@ -5,6 +5,8 @@
 
 # Codex Mobile Bridge · 多客户端远程工作台
 
+> **HarmonyOS 分支**：[鸿蒙使用与签名说明](mobile/harmony/README.md) · [Actions 构建与 HAP 下载](https://github.com/libo0118/codex-mobile-bridge/actions/workflows/harmonyos.yml)。新增 Codex、Keeper、CPA、Magpie 常驻页签，以及本机加密保存的登录信息。Actions 默认产出未签名 HAP，安装前需自己的开发者签名。
+
 > **v2.1.1 正式版**：[发布页](https://github.com/try2love/codex-mobile-bridge/releases/tag/v2.1.1) · [完整更新说明](RELEASE_NOTES.md) · [手机安装说明](mobile/README.md)。统一账号与模型界面，完善模型缓存、草稿保存、文件定位及手机导航体验。
 
 [简体中文](README.md) · [English](README_EN.md)

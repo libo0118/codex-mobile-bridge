@@ -94,6 +94,34 @@ class LoginSecurityTests(unittest.TestCase):
         with patch('bridge.features.auth.auth.time.time', return_value=row['expires'] + 1):
             self.assertIsNone(self.auth.get(token, client, agent))
 
+    def test_mobile_user_agent_does_not_upgrade_valid_browser_sessions(self):
+        client = {'ip': IP, 'peer': IP, 'source': 'direct'}
+        for agent in ('BridgeMobile/0.1-iOS', 'BridgeMobile/0.1-Android', 'BridgeMobile/2.1.1-HarmonyOS',
+                      'BridgeMobile/2.1.1-HarmonyOS BridgeMobile/2.1.1-Android'):
+            for remember in (None, True):
+                for legacy in (False, True):
+                    with self.subTest(agent=agent, remember=remember, legacy=legacy):
+                        with patch('bridge.features.auth.auth.time.time', return_value=1000):
+                            token, row = self.auth.new_session(IP, 'Safari', remember=remember)
+                            deadline = row['expires']
+                            if legacy:
+                                row.pop('trustedDevice')
+                                # Stored UA may already have been overwritten by a request.
+                                row['userAgent'] = agent
+                                self.auth.persist()
+                        for now in (2000, 3000):
+                            with patch('bridge.features.auth.auth.time.time', return_value=now):
+                                self.auth = Auth(CONFIG, self.directory)
+                                row = self.auth.get(token, client, agent)
+                                self.assertIsNotNone(row)
+                                self.assertFalse(row.get('trustedDevice', False))
+                                deadline = now + Auth.REMEMBER_HOURS * 3600 if remember else deadline
+                                self.assertEqual(row['expires'], deadline)
+                                self.assertEqual(Auth(CONFIG, self.directory).get(token)['expires'], deadline)
+                        with patch('bridge.features.auth.auth.time.time', return_value=deadline + 1):
+                            self.auth = Auth(CONFIG, self.directory)
+                            self.assertIsNone(self.auth.get(token, client, agent))
+
     def test_remembered_browser_renews_on_use_and_expires_after_inactivity(self):
         with patch('bridge.features.auth.auth.time.time', return_value=1000):
             token, _ = self.auth.login('tester', 'correct-password', IP, remember=True)
@@ -105,15 +133,22 @@ class LoginSecurityTests(unittest.TestCase):
         with patch('bridge.features.auth.auth.time.time', return_value=1000 + 13 * 86400):
             self.assertIsNone(Auth(CONFIG, self.directory).get(token))
 
-    def test_existing_valid_mobile_session_upgrades_but_expired_one_does_not(self):
+    def test_existing_trusted_mobile_session_upgrades_but_expired_one_does_not(self):
         with patch('bridge.features.auth.auth.time.time', return_value=1000):
-            token, _ = self.auth.new_session(IP)
+            token, row = self.auth.login('tester', 'correct-password', IP, 'BridgeMobile/0.1-iOS')
+            # Successful mobile login sets the trusted marker; emulate its old finite lifetime.
+            row['expires'] = 1000 + Auth.REMEMBER_HOURS * 3600
+            self.auth.persist()
         client = {'ip': IP, 'peer': IP, 'source': 'direct'}
         with patch('bridge.features.auth.auth.time.time', return_value=2000):
+            self.auth = Auth(CONFIG, self.directory)
             self.assertIsNone(self.auth.get('not-authenticated', client, 'BridgeMobile/0.1-iOS'))
-            self.assertEqual(self.auth.get(token, client, 'BridgeMobile/0.1-iOS')['expires'], 0)
+            self.assertEqual(self.auth.get(token, client)['expires'], 0)
+            self.assertTrue(Auth(CONFIG, self.directory).get(token)['trustedDevice'])
         with patch('bridge.features.auth.auth.time.time', return_value=3000):
-            expired, _ = self.auth.new_session(IP)
+            expired, row = self.auth.login('tester', 'correct-password', IP, 'BridgeMobile/0.1-iOS')
+            row['expires'] = 3000 + 12 * 3600
+            self.auth.persist()
         with patch('bridge.features.auth.auth.time.time', return_value=3000 + 13 * 3600):
             self.assertIsNone(self.auth.get(expired, client, 'BridgeMobile/0.1-iOS'))
 
@@ -221,10 +256,13 @@ class LoginHttpTests(unittest.TestCase):
                 self.assertIn('Max-Age=604800', headers['Set-Cookie'])
 
     def test_legacy_cookie_migrates_only_if_owned_by_this_gateway(self):
-        token, _ = self.server.auth.new_session('127.0.0.1')
+        token, session = self.server.auth.new_session('127.0.0.1')
+        deadline = session['expires']
         legacy = 'codex_mobile_session=' + token
-        _, headers, auth = self.request('/api/auth', headers={'Cookie': legacy})
+        _, headers, auth = self.request('/api/auth', headers={'Cookie': legacy, 'User-Agent': 'BridgeMobile/2.1.1-HarmonyOS'})
         self.assertTrue(auth['authenticated'])
+        self.assertFalse(auth['trustedDevice'])
+        self.assertEqual(self.server.auth.get(token)['expires'], deadline)
         self.assertEqual(auth['cookieName'], self.server.auth.cookie_name)
         self.assertTrue(headers['Set-Cookie'].startswith(self.server.auth.cookie_name + '='))
         _, _, foreign = self.request('/api/auth', headers={'Cookie': 'codex_mobile_session=foreign'})
