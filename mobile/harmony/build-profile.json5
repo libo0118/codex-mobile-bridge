@@ -3,9 +3,9 @@
     "signingConfigs": [],
     "products": [{
       "name": "default",
-      "compileSdkVersion": "6.0.0(20)",
+      "compileSdkVersion": "26.0.0(26)",
       "compatibleSdkVersion": "5.0.2(14)",
-      "targetSdkVersion": "6.0.0(20)",
+      "targetSdkVersion": "26.0.0(26)",
       "runtimeOS": "HarmonyOS",
       "buildOption": {
         "strictMode": { "caseSensitiveCheck": true, "useNormalizedOHMUrl": true }

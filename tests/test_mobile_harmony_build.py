@@ -115,7 +115,10 @@ class HarmonyBuildTests(unittest.TestCase):
         self.assertEqual(profile['app']['signingConfigs'], [])
         self.assertNotIn('signingConfig', product)
         self.assertEqual(product['compatibleSdkVersion'], '5.0.2(14)')
-        self.assertEqual(product['targetSdkVersion'], '6.0.0(20)')
+        self.assertEqual(product['compileSdkVersion'], '26.0.0(26)')
+        self.assertEqual(product['targetSdkVersion'], product['compileSdkVersion'])
+        for config in ('oh-package.json5', 'hvigor/hvigor-config.json5'):
+            self.assertEqual(BUILDER.read_json(project / config)['modelVersion'], '6.0.0')
         module = BUILDER.read_json(project / 'entry/src/main/module.json5')['module']
         ability = module['abilities'][0]
         self.assertEqual(module['mainElement'], ability['name'])
