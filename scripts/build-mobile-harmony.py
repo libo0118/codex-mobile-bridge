@@ -114,7 +114,7 @@ def assemble(root, output):
     if hap.exists():
         hap.unlink()
     subprocess.run([hvigor, '--mode', 'module', '-p', 'product=default', '-p', 'module=entry@default',
-                    '-p', 'buildMode=release', 'assembleHap', '--no-daemon'], cwd=project, check=True)
+                    '-p', 'buildMode=release', 'assembleHap', '--no-daemon', '--stacktrace'], cwd=project, check=True)
     if not hap.is_file():
         raise RuntimeError('Hvigor did not produce the expected unsigned entry HAP: ' + str(hap))
     return package_hap(hap, root, output, app, sdk)

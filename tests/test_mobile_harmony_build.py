@@ -106,6 +106,7 @@ class HarmonyBuildTests(unittest.TestCase):
         self.assertEqual(run.call_count, 2)
         self.assertEqual(run.call_args_list[0].args[0], ['/tools/ohpm', 'install', '--all'])
         self.assertIn('assembleHap', run.call_args_list[1].args[0])
+        self.assertIn('--stacktrace', run.call_args_list[1].args[0])
         self.assertNotIn('shell', run.call_args_list[1].kwargs)
 
     def test_project_entry_resources_versions_and_sdk_contract(self):
@@ -116,7 +117,7 @@ class HarmonyBuildTests(unittest.TestCase):
         self.assertNotIn('signingConfig', product)
         self.assertEqual(product['compatibleSdkVersion'], '5.0.2(14)')
         self.assertNotIn('compileSdkVersion', product)
-        self.assertEqual(product['targetSdkVersion'], '26.0.0(26)')
+        self.assertEqual(product['targetSdkVersion'], '26.0.0')
         for config in ('oh-package.json5', 'hvigor/hvigor-config.json5'):
             self.assertEqual(BUILDER.read_json(project / config)['modelVersion'], '6.0.0')
         module = BUILDER.read_json(project / 'entry/src/main/module.json5')['module']

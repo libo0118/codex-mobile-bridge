@@ -4,7 +4,7 @@
     "products": [{
       "name": "default",
       "compatibleSdkVersion": "5.0.2(14)",
-      "targetSdkVersion": "26.0.0(26)",
+      "targetSdkVersion": "26.0.0",
       "runtimeOS": "HarmonyOS",
       "buildOption": {
         "strictMode": { "caseSensitiveCheck": true, "useNormalizedOHMUrl": true }
