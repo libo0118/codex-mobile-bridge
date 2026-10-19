@@ -16,7 +16,7 @@ import { ForegroundEvents } from '../notifications/ForegroundEvents';
 import { ServiceSite, ServiceStore } from '../services/ServiceSite';
 import { ServiceWeb } from '../services/ServiceWeb';
 import { NavigationAppearance } from '../appearance/NavigationAppearance';
-import { detectSystemGlass, NavigationMaterial, SystemGlassAdapter } from '../appearance/NavigationMaterial';
+import { detectSystemGlass, NavigationMaterial, SystemGlassAdapter, SystemGlassModule } from '../appearance/NavigationMaterial';
 
 class BarColors {
   top: string = '';
@@ -93,7 +93,7 @@ struct Index {
       webview.WebCookieManager.putAcceptThirdPartyCookieEnabled(false);
       this.ready = true;
       this.notificationOpened();
-      detectSystemGlass(deviceInfo.sdkApiVersion, () => import('../appearance/SystemGlass26')).then((adapter: SystemGlassAdapter | undefined) => {
+      detectSystemGlass(deviceInfo.sdkApiVersion, (): Promise<SystemGlassModule> => import('../appearance/SystemGlass26')).then((adapter: SystemGlassAdapter | undefined): void => {
         this.systemGlass = adapter;
         this.systemGlassAvailable = adapter !== undefined;
       });

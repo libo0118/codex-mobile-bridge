@@ -74,4 +74,7 @@ test('material modes are exclusive and a custom blur value reaches the native AP
   calls.length = 0;
   new graphics.NavigationMaterial(NaN, false, 3).applyNormalAttribute(target);
   assert.equal(calls[0][2].scale, 1);
+  calls.length = 0;
+  new graphics.NavigationMaterial(55, true, 1, { apply() { throw new Error('device material error'); }, clear() { throw new Error('clear unavailable'); } }).applyNormalAttribute(target);
+  assert.equal(calls[0][1], 'none'); assert.equal(calls[1][1], 'regular'); assert.equal(calls[1][2].scale, .55);
 });

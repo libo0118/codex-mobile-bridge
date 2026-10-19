@@ -28,11 +28,13 @@ export class NavigationMaterial implements AttributeModifier<RowAttribute> {
 
   applyNormalAttribute(target: RowAttribute): void {
     if (this.system && this.adapter) {
-      target.backgroundBlurStyle(BlurStyle.NONE);
-      this.adapter.apply(target, this.thickness);
-      return;
+      try {
+        target.backgroundBlurStyle(BlurStyle.NONE);
+        this.adapter.apply(target, this.thickness);
+        return;
+      } catch (_) { /* A device-side material error must leave the basic navigation usable. */ }
     }
-    if (this.adapter) this.adapter.clear(target);
+    if (this.adapter) { try { this.adapter.clear(target); } catch (_) {} }
     target.backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR, { colorMode: ThemeColorMode.LIGHT, scale: this.blur / 100,
       policy: BlurStyleActivePolicy.FOLLOWS_WINDOW_ACTIVE_STATE, inactiveColor: '#F2F5F8' });
     target.border({ width: 1, color: '#E6FFFFFF' });
