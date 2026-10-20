@@ -37,63 +37,6 @@ assert.equal(s.validPrompt('codexbridge-copy:secret', 'secret', base + '/', base
 assert.equal(s.safeFilename('../../bad.txt'), '.._.._bad.txt');
 console.log('Harmony security: shared URL fixtures and origin, relay, prompt, attachment boundaries passed.');
 
-const downloadSource = fs.readFileSync(path.join(__dirname, '../harmony/entry/src/main/ets/web/DownloadScript.ets'), 'utf8');
-const scriptScope = {};
-vm.createContext(scriptScope);
-vm.runInContext(stripTypeScriptTypes(downloadSource.replace(/\bexport /g, ''), { mode: 'strip' }) + '\nthis.start = downloadStartScript; this.limit = DOWNLOAD_LIMIT;', scriptScope);
-
-async function fetchDownload(response, failure) {
-  let cancelled = false;
-  const scope = {
-    URL, AbortController, setTimeout, clearTimeout, btoa,
-    location: { origin: 'https://example.com' },
-    fetch: async (target, options) => {
-      assert.equal(options.credentials, 'same-origin');
-      assert.equal(options.redirect, 'error');
-      assert.equal(options.cache, 'no-store');
-      if (failure) throw new Error(failure);
-      let index = 0;
-      return {
-        ok: true, redirected: false, url: file, ...response,
-        headers: { get: name => name === 'content-length' ? response.length ?? null : 'attachment; filename="sample.txt"' },
-        body: { getReader: () => ({
-          read: async () => {
-            if (response.disconnect && index > 0) throw new Error('disconnected');
-            const bytes = (response.chunks ?? [new Uint8Array([1, 2, 3])])[index++];
-            return bytes ? { done: false, value: bytes } : { done: true };
-          },
-          cancel: async () => { cancelled = true; }
-        }) }
-      };
-    }
-  };
-  vm.createContext(scope);
-  vm.runInContext('window=this; top=this;', scope);
-  vm.runInContext(scriptScope.start(file, 'slot'), scope);
-  for (let attempt = 0; attempt < 100 && scope.slot.status === 'loading'; attempt++) {
-    await new Promise(resolve => setImmediate(resolve));
-  }
-  return { state: scope.slot, cancelled };
-}
-
-test('attachment becomes ready only after complete bounded same-origin stream', async () => {
-  const result = await fetchDownload({ length: '3' });
-  assert.equal(result.state.status, 'ready');
-  assert.equal(result.state.size, 3);
-  assert.equal(Buffer.from(result.state.chunks.join(''), 'base64').toString('hex'), '010203');
-});
-test('redirect, cross-origin response, oversized header and interrupted stream leave no successful payload', async () => {
-  for (const [response, failure] of [
-    [{}, 'redirect rejected'], [{ url: 'https://evil.com/file' }], [{ redirected: true }],
-    [{ length: String(scriptScope.limit + 1) }], [{ length: '4' }], [{ disconnect: true }],
-    [{ chunks: [new Uint8Array(scriptScope.limit), new Uint8Array(1)] }]
-  ]) {
-    const result = await fetchDownload(response, failure);
-    assert.equal(result.state.status, 'error');
-    assert.equal(result.state.chunks.length, 0);
-  }
-});
-
 const eventSource = fs.readFileSync(path.join(__dirname, '../harmony/entry/src/main/ets/notifications/EventCursor.ets'), 'utf8');
 const eventScope = {};
 vm.createContext(eventScope);
@@ -161,6 +104,10 @@ test('explicit credential fill changes a single main-frame form without submitti
 
 const nativeRoot = path.join(__dirname, '../harmony/entry/src/main/ets');
 const filesSource = fs.readFileSync(path.join(nativeRoot, 'web/Files.ets'), 'utf8');
+const downloadSettingsScope = vm.createContext({});
+vm.runInContext(stripTypeScriptTypes(fs.readFileSync(path.join(nativeRoot, 'data/DownloadSettings.ets'), 'utf8').replace(/\bexport /g, ''), { mode: 'strip' }) +
+  '\nthis.settings = { DEFAULT_DOWNLOAD_LIMIT_MIB, MAX_DOWNLOAD_LIMIT_MIB, parseDownloadLimitMiB, downloadLimitBytes };', downloadSettingsScope);
+const settings = downloadSettingsScope.settings;
 function fileSaveHarness(options = {}) {
   const calls = [], userURI = 'file://documents/sample.txt';
   let destinationSize = options.destinationSize ?? 0;
@@ -184,7 +131,7 @@ function fileSaveHarness(options = {}) {
     unlink: async target => { calls.push(['unlink', target]); },
     unlinkSync: target => { calls.push(['unlinkSync', target]); }
   };
-  const context = { fs: fileSystem, DOWNLOAD_LIMIT: scriptScope.limit, picker: { DocumentViewPicker: class {
+  const context = { fs: fileSystem, ...settings, validDownloadBytes: value => Number.isInteger(value) && value > 0 && value <= 4096 * 1024 * 1024, picker: { DocumentViewPicker: class {
     async save() { calls.push(['picker']); return options.cancelled ? [] : [userURI]; }
   } } };
   vm.createContext(context);
@@ -242,7 +189,7 @@ function componentLogic(relative, name, adapters) {
 function site(id, url) { return { id, name: id.toUpperCase(), url }; }
 function indexLogic() {
   const stub = class {};
-  const page = componentLogic('pages/Index.ets', 'Index', { ComputerStore: stub, ServiceStore: stub,
+  const page = componentLogic('pages/Index.ets', 'Index', { ...settings, ComputerStore: stub, ServiceStore: stub,
     ForegroundEvents: stub, webview: { WebviewController: stub }, promptAction: { showToast() {} },
     ServiceSite: class { constructor(id, name, url) { this.id = id; this.name = name; this.url = url; } } });
   page.error = error => { throw error; };

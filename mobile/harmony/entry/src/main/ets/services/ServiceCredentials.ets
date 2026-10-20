@@ -8,6 +8,8 @@ export struct ServiceCredentials {
   @Prop @Watch('scopeChanged') configuredUrl: string = '';
   @Prop @Watch('scopeChanged') currentUrl: string = '';
   @Prop @Watch('scopeChanged') active: boolean = false;
+  @Prop compactTrigger: boolean = false;
+  @Prop @Watch('requestOpen') openRequest: number = 0;
   onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => void = () => {};
   @State @Watch('sheetChanged') open: boolean = false;
   @State username: string = '';
@@ -21,6 +23,8 @@ export struct ServiceCredentials {
   private vault: CredentialVault = new CredentialVault();
 
   aboutToDisappear(): void { this.scopeChanged(); }
+
+  private requestOpen(): void { if (this.active && !this.busy && !this.open) this.show(); }
 
   private scopeChanged(): void {
     this.generation++;
@@ -121,8 +125,12 @@ export struct ServiceCredentials {
   }
 
   build() {
-    Button('登录信息').height(44).fontSize(14).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active)
-      .onClick(() => { this.show(); })
+    Column() {
+      if (!this.compactTrigger) {
+        Button('登录信息').height(44).fontSize(14).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active)
+          .onClick(() => { this.show(); })
+      }
+    }.width(this.compactTrigger ? 1 : 88).height(this.compactTrigger ? 1 : 44)
       .bindSheet($$this.open, this.sheetContent(), { height: SheetSize.FIT_CONTENT, showClose: true })
   }
 }

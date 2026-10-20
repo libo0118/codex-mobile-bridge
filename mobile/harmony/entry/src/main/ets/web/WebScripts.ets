@@ -1,5 +1,7 @@
 import common from '@ohos.app.ability.common';
 import util from '@ohos.util';
+import { HARMONY_DISPLAY_STYLE_SCRIPT } from './DisplayStyle';
+import { PROVIDER_SWITCHER_SCRIPT } from './ProviderSwitcher';
 
 export async function loadMobileScripts(context: common.UIAbilityContext): Promise<string> {
   const decoder = util.TextDecoder.create('utf-8');
@@ -19,6 +21,8 @@ export function mobileScript(source: string, token: string, expectedURL: string)
     document.addEventListener('click', event => { if (event.isTrusted) window[marker] = Date.now(); }, true);
     document.addEventListener('keydown', event => { if (event.isTrusted && (event.key === 'Enter' || event.key === ' ')) window[marker] = Date.now(); }, true);
     ${source.replace(new RegExp('__BRIDGE_CLIPBOARD_TOKEN__', 'g'), token)}
+    ${HARMONY_DISPLAY_STYLE_SCRIPT}
+    ${PROVIDER_SWITCHER_SCRIPT}
   })()`;
 }
 

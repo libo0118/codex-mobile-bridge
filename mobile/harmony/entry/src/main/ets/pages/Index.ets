@@ -8,6 +8,7 @@ import notificationManager from '@ohos.notificationManager';
 import deviceInfo from '@ohos.deviceInfo';
 import { scanBarcode, scanCore } from '@kit.ScanKit';
 import { Computer, ComputerStore } from '../data/ComputerStore';
+import { DEFAULT_DOWNLOAD_LIMIT_MIB, MAX_DOWNLOAD_LIMIT_MIB, parseDownloadLimitMiB, downloadLimitBytes } from '../data/DownloadSettings';
 import { connectionURL, gatewayConnection, sameGateway, isPreviewShell, acceptsDownload, externalHTTP, validPrompt, chatURL } from '../security/GatewayURL';
 import { loadMobileScripts, mobileScript, uploadGestureScript, BACK_SCRIPT } from '../web/WebScripts';
 import { webString } from '../web/DownloadScript';
@@ -42,6 +43,7 @@ struct Index {
   @State downloadName: string = '';
   @State alerts: boolean = false;
   @State activeTab: string = 'codex';
+  @State keeperBackRequest: number = 0;
   @State services: ServiceSite[] = [];
   @State loadedServices: ServiceSite[] = [];
   @State configId: string = '';
@@ -57,6 +59,11 @@ struct Index {
   @State navigationSettings: boolean = false;
   @State savingNavigation: boolean = false;
   @State systemGlassAvailable: boolean = false;
+  @State downloadLimitMiB: number = DEFAULT_DOWNLOAD_LIMIT_MIB;
+  @State editDownloadLimit: string = DEFAULT_DOWNLOAD_LIMIT_MIB.toString();
+  @State downloadSettings: boolean = false;
+  @State savingDownloadSettings: boolean = false;
+  @State downloadSettingsError: string = '';
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   private store: ComputerStore = new ComputerStore();
   private controller: webview.WebviewController = new webview.WebviewController();
@@ -83,6 +90,7 @@ struct Index {
       this.computers = await this.store.load(this.context);
       this.language = await this.store.savedLanguage();
       this.alerts = await this.store.savedAlerts();
+      this.downloadLimitMiB = await this.store.savedDownloadLimitMiB();
       const appearance = await this.store.savedNavigationAppearance();
       this.navigationBlur = appearance.blur;
       this.navigationSystem = appearance.system;
@@ -387,7 +395,7 @@ struct Index {
   }
 
   private openNavigationSettings(): void {
-    if (!this.ready || this.savingNavigation || this.navigationSettings) return;
+    if (!this.ready || this.savingNavigation || this.navigationSettings || this.downloadSettings) return;
     this.editNavigationBlur = this.navigationBlur;
     this.editNavigationSystem = this.navigationSystem;
     this.editNavigationThickness = this.navigationThickness;
@@ -413,6 +421,71 @@ struct Index {
       this.navigationSettings = false;
     } catch (error) { this.error(error as Error); }
     finally { this.savingNavigation = false; }
+  }
+
+  private openDownloadSettings(): void {
+    if (!this.ready || this.savingDownloadSettings || this.downloadSettings || this.navigationSettings) return;
+    this.editDownloadLimit = this.downloadLimitMiB.toString();
+    this.downloadSettingsError = '';
+    this.downloadSettings = true;
+  }
+
+  private closeDownloadSettings(): void {
+    if (!this.savingDownloadSettings) this.downloadSettings = false;
+  }
+
+  private dismissDownloadSettings(action: DismissSheetAction): void {
+    if (this.savingDownloadSettings) return;
+    this.closeDownloadSettings();
+    action.dismiss();
+  }
+
+  private async saveDownloadSettings(): Promise<void> {
+    if (!this.downloadSettings || this.savingDownloadSettings) return;
+    const value = parseDownloadLimitMiB(this.editDownloadLimit);
+    if (value === undefined) {
+      this.downloadSettingsError = this.L('请输入 1–4096 MB 的整数。', 'Enter a whole number from 1 to 4096 MB.');
+      return;
+    }
+    this.savingDownloadSettings = true;
+    this.downloadSettingsError = '';
+    try {
+      await this.store.downloadLimitMiB(value);
+      this.downloadLimitMiB = value;
+      this.downloadSettings = false;
+    } catch (error) { this.downloadSettingsError = (error as Error).message || this.L('保存失败，请重试。', 'Could not save. Please retry.'); }
+    finally { this.savingDownloadSettings = false; }
+  }
+
+  @Builder
+  private downloadSettingsPanel() {
+    Scroll() {
+      Column({ space: 16 }) {
+        Text(this.L('下载设置', 'Download settings')).fontSize(23).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%')
+        Text(this.L('单个附件大小上限（MB）', 'Maximum attachment size (MB)')).fontSize(16).fontColor('#202124').width('100%')
+        TextInput({ text: this.editDownloadLimit, placeholder: DEFAULT_DOWNLOAD_LIMIT_MIB.toString() })
+          .type(InputType.Number).maxLength(10).fontSize(16).height(54).width('100%').enabled(!this.savingDownloadSettings)
+          .accessibilityText(this.L('下载阈值，单位 MB', 'Download limit in MB'))
+          .onChange((value: string) => { this.editDownloadLimit = value; this.downloadSettingsError = ''; })
+        if (this.downloadSettingsError) {
+          Text(this.downloadSettingsError).fontSize(14).fontColor('#b44235').width('100%')
+        }
+        Text(this.L('范围 1–', 'Range: 1–') + MAX_DOWNLOAD_LIMIT_MIB.toString() + this.L(' MB；1 MB = 1024 × 1024 字节。', ' MB; 1 MB = 1024 × 1024 bytes.'))
+          .fontSize(13).fontColor('#777b80').width('100%')
+        Text(this.L('新设置用于下一次下载，当前下载与已下载的文件不受影响。电脑网关的下载上限也需满足此大小。',
+          'Changes apply to the next download. Current and completed downloads keep their original limit. Your computer gateway must also allow this size.'))
+          .fontSize(14).fontColor('#777b80').width('100%')
+        Button(this.L('恢复默认 200 MB', 'Reset to 200 MB')).width('100%').constraintSize({ minHeight: 44 }).borderRadius(12)
+          .backgroundColor('#f4f5f7').fontColor('#202124').enabled(!this.savingDownloadSettings)
+          .onClick(() => { this.editDownloadLimit = DEFAULT_DOWNLOAD_LIMIT_MIB.toString(); this.downloadSettingsError = ''; })
+        Row({ space: 12 }) {
+          Button(this.L('取消', 'Cancel')).layoutWeight(1).height(48).backgroundColor('#f4f5f7').fontColor('#202124')
+            .enabled(!this.savingDownloadSettings).onClick(() => { this.closeDownloadSettings(); })
+          Button(this.savingDownloadSettings ? this.L('保存中…', 'Saving…') : this.L('保存', 'Save')).layoutWeight(1).height(48)
+            .backgroundColor('#202124').fontColor('#ffffff').enabled(!this.savingDownloadSettings).onClick(() => { this.saveDownloadSettings(); })
+        }.width('100%')
+      }.width('100%').alignItems(HorizontalAlign.Start).padding({ left: 20, right: 20, top: 8, bottom: 24 })
+    }.width('100%').height('100%')
   }
 
   @Builder
@@ -507,14 +580,14 @@ struct Index {
     if (!this.foreground || !sameGateway(this.currentURL(), this.base) || !acceptsDownload(target, this.base)) return;
     const ticket = this.generation;
     const base = this.base;
-    const task = new AttachmentDownload();
+    const task = new AttachmentDownload(downloadLimitBytes(this.downloadLimitMiB));
     this.attachment = task;
     this.downloadBusy = true;
     this.downloadLabel = this.L('正在下载…', 'Downloading…');
     try {
       const result = await task.fetch(this.context, this.controller, target, base,
         () => ticket === this.generation && this.base === base && sameGateway(this.currentURL(), base),
-        (bytes: number) => { if (ticket === this.generation) this.downloadLabel = this.L('正在下载 · ', 'Downloading · ') + (bytes / 1024).toFixed(0) + ' KiB'; });
+        (bytes: number) => { if (ticket === this.generation && this.attachment === task) this.downloadLabel = this.L('正在下载 · ', 'Downloading · ') + (bytes / 1024).toFixed(0) + ' KiB'; });
       if (ticket !== this.generation || this.attachment !== task) { discardAttachment(result); return; }
       this.downloaded = result;
       this.downloadName = result.name;
@@ -550,9 +623,24 @@ struct Index {
     if (sameGateway(this.currentURL(), this.base) && !isPreviewShell(this.currentURL(), this.base)) this.controller.runJavaScript(script).catch(() => {});
   }
 
+  private openGatewayControl(id: string): void {
+    const unavailable = this.L('当前网关没有可用的入口，请刷新页面或更新网关后重试。', 'This gateway control is unavailable. Refresh the page or update your gateway and retry.');
+    const unsupported = this.L('共享中继连接不支持第三方通知，请在电脑网关中设置。', 'Third-party alerts are unavailable over a shared relay. Configure them in your computer gateway.');
+    this.webAction(`(() => {
+      const id = ${JSON.stringify(id)};
+      if (id === 'pushplus-settings' && window.BridgeSharedRelay) { window.alert(${JSON.stringify(unsupported)}); return; }
+      if (id === 'accounts-button' && typeof window.BridgeNavigation?.accounts === 'function') return window.BridgeNavigation.accounts();
+      const control = document.getElementById(id);
+      if (!control || control.disabled || typeof control.click !== 'function') { window.alert(${JSON.stringify(unavailable)}); return; }
+      control.click();
+    })()`);
+  }
+
   onBackPress(): boolean {
+    if (this.downloadSettings) { this.closeDownloadSettings(); return true; }
     if (this.navigationSettings) { if (!this.savingNavigation) this.navigationSettings = false; return true; }
     if (this.configId) { if (!this.savingServices.includes(this.configId)) this.closeServiceConfig(); return true; }
+    if (this.activeTab === 'keeper') { this.keeperBackRequest++; return true; }
     if (this.activeTab !== 'codex') { this.selectTab('codex'); return true; }
     if (!this.connected) return false;
     const ticket = this.generation;
@@ -567,16 +655,17 @@ struct Index {
   private gatewayMenu() {
     Menu() {
       MenuItem({ content: this.L('返回电脑列表', 'Computers') }).onClick(() => { this.home(); })
-      MenuItem({ content: this.L('账号与接入', 'Accounts and access') }).onClick(() => {
-        this.webAction("(() => { if (typeof window.BridgeNavigation?.accounts === 'function') return window.BridgeNavigation.accounts(); document.getElementById('accounts-button')?.click(); })()");
-      })
+      MenuItem({ content: this.L('账号管理', 'Accounts') }).onClick(() => { this.openGatewayControl('accounts-button'); })
+      MenuItem({ content: this.L('第三方通知', 'Third-party alerts') }).onClick(() => { this.openGatewayControl('pushplus-settings'); })
+      MenuItem({ content: this.L('应用管理', 'Applications') }).onClick(() => { this.openGatewayControl('clients-button'); })
       MenuItem({ content: this.L('外观与显示', 'Appearance') }).onClick(() => { this.webAction("document.querySelector('[data-open-appearance]')?.click()"); })
       MenuItem({ content: this.L('底栏外观', 'Navigation appearance') }).onClick(() => { this.openNavigationSettings(); })
+      MenuItem({ content: this.L('下载设置', 'Download settings') }).onClick(() => { this.openDownloadSettings(); })
       MenuItem({ content: this.L('刷新页面', 'Refresh') }).onClick(() => { this.controller.refresh(); })
       MenuItem({ content: this.alerts ? this.L('关闭前台任务通知', 'Disable foreground alerts') : this.L('开启前台任务通知', 'Enable foreground alerts') }).onClick(() => { this.toggleAlerts(); })
       MenuItem({ content: this.L('关于鸿蒙版', 'About HarmonyOS') }).onClick(() => {
-        this.message(this.L('Codex Mobile Bridge 2.1.1 · HarmonyOS\n聊天、配对与文件管理沿用电脑网关。任务通知仅当前电脑、App 前台有效；首版不含后台推送和设备密钥凭据恢复。附件下载上限 20 MiB。',
-          'Codex Mobile Bridge 2.1.1 · HarmonyOS\nChats, pairing and files use your gateway. Alerts run for the current computer while this app is visible. Background push and encrypted credential recovery are not included. Attachment limit: 20 MiB.'));
+        this.message(this.L('Codex Mobile Bridge 2.1.1 · HarmonyOS\n聊天、配对与文件管理沿用电脑网关。任务通知仅当前电脑、App 前台有效；首版不含后台推送和设备密钥凭据恢复。下一次附件下载上限：',
+          'Codex Mobile Bridge 2.1.1 · HarmonyOS\nChats, pairing and files use your gateway. Alerts run for the current computer while this app is visible. Background push and encrypted credential recovery are not included. Next attachment limit: ') + this.downloadLimitMiB.toString() + ' MB.');
       })
     }
   }
@@ -681,13 +770,15 @@ struct Index {
         }.width('100%').height('100%').visibility(this.activeTab === 'codex' ? Visibility.Visible : Visibility.Hidden)
         ForEach(this.loadedServices, (site: ServiceSite) => {
           ServiceWeb({ site: site, active: this.activeTab === site.id && !this.configId,
+            backRequest: this.keeperBackRequest,
+            onAppBack: () => { if (this.activeTab === 'keeper' && !this.configId) this.selectTab('codex'); },
             onConfigure: () => { this.configureService(site); } })
             .visibility(this.activeTab === site.id && !this.configId ? Visibility.Visible : Visibility.Hidden)
         }, (site: ServiceSite) => site.id + '|' + site.url)
         if (this.configId) {
           Column({ space: 16 }) {
             Text(this.configId === 'keeper' ? 'Keeper' : '配置管理站点').fontSize(23).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%')
-            Text(this.configId === 'keeper' ? 'Keeper 使用固定地址。登录信息可在网页工具栏中保存；你在应用内自行输入。' : '填写真实 HTTPS 地址。保存后首次加载；之后切换页签保留网页。修改地址会重新加载此站点。')
+            Text(this.configId === 'keeper' ? 'Keeper 使用固定地址。登录信息可在右上角更多菜单中保存；你在应用内自行输入。' : '填写真实 HTTPS 地址。保存后首次加载；之后切换页签保留网页。修改地址会重新加载此站点。')
               .fontSize(14).fontColor('#777b80').width('100%')
             TextInput({ text: this.serviceName, placeholder: '站点名称' }).maxLength(16).enabled(this.configId !== 'keeper' && !this.savingServices.includes(this.configId)).onChange((value: string) => { this.serviceName = value; })
             TextInput({ text: this.serviceAddress, placeholder: 'https://' }).type(InputType.URL).maxLength(4096).enabled(this.configId !== 'keeper' && !this.savingServices.includes(this.configId)).onChange((value: string) => { this.serviceAddress = value; })
@@ -697,6 +788,8 @@ struct Index {
           }.alignItems(HorizontalAlign.Start).padding(24).width('100%').height('100%').backgroundColor('#f5f5f3')
         }
       }.width('100%').layoutWeight(1)
+        .bindSheet($$this.downloadSettings, this.downloadSettingsPanel(), { height: '70%', showClose: !this.savingDownloadSettings,
+          backgroundColor: '#f5f5f3', onWillDismiss: (action: DismissSheetAction) => { this.dismissDownloadSettings(action); } })
       Row() {
         Row() {
           Row({ space: 2 }) {

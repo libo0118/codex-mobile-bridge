@@ -2,6 +2,7 @@ import common from '@ohos.app.ability.common';
 import preferences from '@ohos.data.preferences';
 import { gatewayConnection } from '../security/GatewayURL';
 import { NavigationAppearance, decodeNavigationAppearance } from '../appearance/NavigationAppearance';
+import { DEFAULT_DOWNLOAD_LIMIT_MIB, isDownloadLimitMiB } from './DownloadSettings';
 
 export class Computer {
   base: string = '';
@@ -75,5 +76,25 @@ export class ComputerStore {
     const saved = new NavigationAppearance(value.system, value.blur, value.thickness);
     await this.prefs.put('navigationAppearance', JSON.stringify(saved));
     await this.prefs.flush();
+  }
+
+  async savedDownloadLimitMiB(): Promise<number> {
+    if (!this.prefs) return DEFAULT_DOWNLOAD_LIMIT_MIB;
+    const saved = await this.prefs.get('downloadLimitMiB', DEFAULT_DOWNLOAD_LIMIT_MIB);
+    return typeof saved === 'number' && isDownloadLimitMiB(saved) ? saved : DEFAULT_DOWNLOAD_LIMIT_MIB;
+  }
+
+  async downloadLimitMiB(value: number): Promise<void> {
+    if (!isDownloadLimitMiB(value)) throw new Error('下载阈值须为 1–4096 MB 的整数');
+    if (!this.prefs) throw new Error('应用设置尚未就绪，请重试');
+    const previous = await this.prefs.get('downloadLimitMiB', DEFAULT_DOWNLOAD_LIMIT_MIB);
+    try {
+      await this.prefs.put('downloadLimitMiB', value);
+      await this.prefs.flush();
+    } catch (error) {
+      // Preferences.put changes the cache before flush; restore only this setting after failure.
+      try { await this.prefs.put('downloadLimitMiB', previous); await this.prefs.flush(); } catch (_) {}
+      throw error;
+    }
   }
 }

@@ -6,17 +6,22 @@ import { ServiceCredentials } from './ServiceCredentials';
 import { webString } from '../web/DownloadScript';
 import { credentialFillScript } from './CredentialFill';
 import { CredentialKind } from './CredentialVault';
+import { keeperPage, keeperUiScript } from './KeeperUi';
 
 @Component
 export struct ServiceWeb {
   @Prop site: ServiceSite = new ServiceSite('', '', '');
   @Prop active: boolean = false;
+  @Prop @Watch('requestBack') backRequest: number = 0;
   onConfigure: () => void = () => {};
+  onAppBack: () => void = () => {};
   @State status: string = '';
   @State currentURL: string = '';
+  @State loginRequest: number = 0;
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   private controller: webview.WebviewController = new webview.WebviewController();
   private initialURL: string = '';
+  private backGeneration: number = 0;
 
   aboutToAppear(): void { this.initialURL = this.site.url; }
 
@@ -45,9 +50,43 @@ export struct ServiceWeb {
     try { if (this.controller.accessBackward()) this.controller.backward(); } catch (_) {}
   }
 
+  private keeperCommand(command: string = ''): void {
+    if (this.site.id !== 'keeper') return;
+    try {
+      const current = this.controller.getUrl();
+      if (!keeperPage(current) || (command && !this.active)) return;
+      this.controller.runJavaScript(keeperUiScript(current, command)).catch(() => {});
+    } catch (_) {}
+  }
+
+  private requestBack(): void {
+    if (!this.active || this.site.id !== 'keeper') return;
+    const ticket = ++this.backGeneration;
+    let current: string = this.currentURL;
+    try { current = this.controller.getUrl(); } catch (_) {}
+    let finished: boolean = false;
+    const finish = (consumed: boolean): void => {
+      if (finished) return;
+      finished = true; clearTimeout(timer);
+      if (!consumed && ticket === this.backGeneration && this.active && this.site.id === 'keeper' && this.currentURL === current) this.onAppBack();
+    };
+    const timer = setTimeout((): void => { finish(false); }, 1000);
+    if (!keeperPage(current)) { finish(false); return; }
+    this.controller.runJavaScript(keeperUiScript(current, 'back')).then((result: string): void => { finish(webString(result) === 'closed'); }).catch((): void => { finish(false); });
+  }
+
   @Builder
   private pageMenu() {
     Menu() {
+      if (this.site.id === 'keeper') {
+        MenuItem({ content: '页面切换' }).onClick(() => { this.keeperCommand('pages'); })
+        MenuItem({ content: '平台筛选' }).onClick(() => { this.keeperCommand('providers'); })
+        MenuItem({ content: '认证文件' }).onClick(() => { this.keeperCommand('auth'); })
+        MenuItem({ content: '站点工具' }).onClick(() => { this.keeperCommand('tools'); })
+        MenuItem({ content: '网页返回' }).onClick(() => { this.back(); })
+        MenuItem({ content: '登录信息' }).onClick(() => { if (this.active) this.loginRequest++; })
+        MenuItem({ content: '切换原网页工具栏' }).onClick(() => { this.keeperCommand('layout'); })
+      }
       MenuItem({ content: '刷新页面' }).onClick(() => { if (this.active) this.controller.refresh(); })
       MenuItem({ content: '站点设置' }).onClick(() => { if (this.active) this.onConfigure(); })
     }
@@ -73,28 +112,44 @@ export struct ServiceWeb {
     }
   }
 
-  build() {
+  @Builder
+  private servicePage() {
     Column() {
-      Row({ space: 8 }) {
-        Text(this.site.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
-          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        Button('返回').height(44).fontSize(14).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active).onClick(() => { this.back(); })
-        ServiceCredentials({ serviceId: this.site.id, configuredUrl: this.site.url, currentUrl: this.currentURL, active: this.active,
-          onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => { this.fill(username, secret, scope, kind); } })
-        Button('•••').width(44).height(44).fontSize(17).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active)
-          .accessibilityText('页面选项').bindMenu(this.pageMenu)
-      }.height(56).padding({ left: 16, right: 12 }).width('100%').backgroundColor('#f5f5f3')
+      if (this.site.id !== 'keeper') {
+        Row({ space: 8 }) {
+          Text(this.site.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          Button('返回').height(44).fontSize(14).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active).onClick(() => { this.back(); })
+          ServiceCredentials({ serviceId: this.site.id, configuredUrl: this.site.url, currentUrl: this.currentURL, active: this.active,
+            onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => { this.fill(username, secret, scope, kind); } })
+          Button('•••').width(44).height(44).fontSize(17).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active)
+            .accessibilityText('页面选项').bindMenu(this.pageMenu)
+        }.height(56).padding({ left: 16, right: 12 }).width('100%').backgroundColor('#f5f5f3')
+      }
       if (this.status) { Text(this.status).fontSize(12).fontColor('#777b80').padding(6).width('100%') }
       Web({ src: this.initialURL, controller: this.controller })
         .javaScriptAccess(true).domStorageAccess(true).fileAccess(false).mixedMode(MixedMode.None).multiWindowAccess(false).geolocationAccess(false)
         .onLoadIntercept((event) => event ? this.navigate(event.data) : true)
         .onPageBegin((event) => { if (event) { this.currentURL = event.url; this.status = ''; } })
         .onPageEnd((event) => {
-          if (event && this.allowed(event.url)) { this.currentURL = event.url; webview.WebCookieManager.saveCookieAsync().catch(() => {}); }
+          if (event && this.allowed(event.url)) { this.currentURL = event.url; webview.WebCookieManager.saveCookieAsync().catch(() => {}); this.keeperCommand(); }
         })
-        .onRefreshAccessedHistory((event) => { if (event) this.currentURL = event.url; })
+        .onRefreshAccessedHistory((event) => { if (event) { this.currentURL = event.url; this.keeperCommand(); } })
         .onErrorReceive((event) => { if (event && event.request.isMainFrame()) this.status = '连接失败，请检查网络后手动刷新。'; })
         .width('100%').layoutWeight(1)
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
+  }
+
+  build() {
+    Stack({ alignContent: Alignment.TopEnd }) {
+      this.servicePage()
+      if (this.site.id === 'keeper') {
+        Button('•••').width(44).height(44).fontSize(17).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active)
+          .accessibilityText('Keeper 页面选项').bindMenu(this.pageMenu).margin({ top: 2, right: 8 })
+        ServiceCredentials({ serviceId: this.site.id, configuredUrl: this.site.url, currentUrl: this.currentURL, active: this.active,
+          compactTrigger: true, openRequest: this.loginRequest,
+          onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => { this.fill(username, secret, scope, kind); } })
+      }
+    }.width('100%').height('100%')
   }
 }
