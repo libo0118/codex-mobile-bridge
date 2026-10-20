@@ -37,7 +37,7 @@ export const KEEPER_UI_SCRIPT: string = String.raw`
     'html[data-hos-keeper] section.keeper-card-surface article{font-size:16px;line-height:1.5;border-radius:14px;margin:10px 0;padding:14px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);min-width:0}' +
     'html[data-hos-keeper] section.keeper-card-surface article button{min-height:44px;min-width:44px}' +
     'html[data-hos-keeper] section.keeper-card-surface article>*{min-width:0;overflow-wrap:anywhere}' +
-    '#bridge-keeper-summary{min-height:48px;display:flex;align-items:center;padding:0 60px 0 16px;gap:8px;color:var(--text-secondary,#616975);font-size:13px}' +
+    '#bridge-keeper-summary{min-height:48px;display:flex;align-items:center;padding:0 16px;gap:8px;color:var(--text-secondary,#616975);font-size:13px}' +
     '#bridge-keeper-summary button{font:inherit;font-size:17px;font-weight:650;min-height:44px;border:0;background:transparent;color:var(--text-primary,#202124);padding:0;max-width:100%;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}' +
     '#bridge-keeper-summary span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     '#bridge-keeper-layer{position:fixed;inset:0;z-index:2147483600;background:#0005;display:flex;align-items:flex-start;padding:56px 12px 12px}' +
