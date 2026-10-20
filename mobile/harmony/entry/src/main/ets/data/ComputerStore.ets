@@ -94,7 +94,7 @@ export class ComputerStore {
     } catch (error) {
       // Preferences.put changes the cache before flush; restore only this setting after failure.
       try { await this.prefs.put('downloadLimitMiB', previous); await this.prefs.flush(); } catch (_) {}
-      throw error;
+      throw error as Error;
     }
   }
 }
