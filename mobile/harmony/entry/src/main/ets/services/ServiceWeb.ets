@@ -115,34 +115,22 @@ export struct ServiceWeb {
   @Builder
   private servicePage() {
     Column() {
-      if (this.site.id === 'keeper') {
-        Row({ space: 8 }) {
-          Text(this.site.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
-            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-          Button({ type: ButtonType.Normal, stateEffect: true }) {
-            Image($r('app.media.keeper_header_back')).width(24).height(24).objectFit(ImageFit.Contain)
-          }.width(44).height(44).padding(10).borderRadius(12).backgroundColor('#f4f5f7').enabled(this.active)
-            .accessibilityText('Keeper 网页返回').onClick(() => { this.back(); })
-          Button({ type: ButtonType.Normal, stateEffect: true }) {
-            Image($r('app.media.keeper_header_key')).width(24).height(24).objectFit(ImageFit.Contain)
-          }.width(44).height(44).padding(10).borderRadius(12).backgroundColor('#f4f5f7').enabled(this.active)
-            .accessibilityText('Keeper 登录信息').onClick(() => { if (this.active) this.loginRequest++; })
-          Button({ type: ButtonType.Normal, stateEffect: true }) {
-            Image($r('app.media.keeper_header_more')).width(24).height(24).objectFit(ImageFit.Contain)
-          }.width(44).height(44).padding(10).borderRadius(12).backgroundColor('#f4f5f7').enabled(this.active)
-            .accessibilityText('Keeper 页面选项').bindMenu(this.pageMenu)
-        }.height(56).padding({ left: 16, right: 12 }).width('100%').backgroundColor('#f5f5f3')
-      } else {
-        Row({ space: 8 }) {
-          Text(this.site.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
-            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-          Button('返回').height(44).fontSize(14).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active).onClick(() => { this.back(); })
-          ServiceCredentials({ serviceId: this.site.id, configuredUrl: this.site.url, currentUrl: this.currentURL, active: this.active,
-            onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => { this.fill(username, secret, scope, kind); } })
-          Button('•••').width(44).height(44).fontSize(17).backgroundColor('#f4f5f7').fontColor('#202124').enabled(this.active)
-            .accessibilityText('页面选项').bindMenu(this.pageMenu)
-        }.height(56).padding({ left: 16, right: 12 }).width('100%').backgroundColor('#f5f5f3')
-      }
+      Row({ space: 8 }) {
+        Text(this.site.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
+          .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
+          Image($r('app.media.keeper_header_back')).width(24).height(24).objectFit(ImageFit.Contain)
+        }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
+          .accessibilityText(this.site.name + ' 网页返回').onClick(() => { this.back(); })
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
+          Image($r('app.media.keeper_header_key')).width(24).height(24).objectFit(ImageFit.Contain)
+        }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
+          .accessibilityText(this.site.name + ' 登录信息').onClick(() => { if (this.active) this.loginRequest++; })
+        Button({ type: ButtonType.Normal, stateEffect: true }) {
+          Image($r('app.media.keeper_header_more')).width(24).height(24).objectFit(ImageFit.Contain)
+        }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
+          .accessibilityText(this.site.name + ' 页面选项').bindMenu(this.pageMenu)
+      }.height(56).padding({ left: 16, right: 12 }).width('100%').backgroundColor('#f5f5f3')
       if (this.status) { Text(this.status).fontSize(12).fontColor('#777b80').padding(6).width('100%') }
       Web({ src: this.initialURL, controller: this.controller })
         .javaScriptAccess(true).domStorageAccess(true).fileAccess(false).mixedMode(MixedMode.None).multiWindowAccess(false).geolocationAccess(false)
@@ -160,11 +148,9 @@ export struct ServiceWeb {
   build() {
     Stack({ alignContent: Alignment.TopEnd }) {
       this.servicePage()
-      if (this.site.id === 'keeper') {
-        ServiceCredentials({ serviceId: this.site.id, configuredUrl: this.site.url, currentUrl: this.currentURL, active: this.active,
-          compactTrigger: true, openRequest: this.loginRequest,
-          onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => { this.fill(username, secret, scope, kind); } })
-      }
+      ServiceCredentials({ serviceId: this.site.id, configuredUrl: this.site.url, currentUrl: this.currentURL, active: this.active,
+        compactTrigger: true, openRequest: this.loginRequest,
+        onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => { this.fill(username, secret, scope, kind); } })
     }.width('100%').height('100%')
   }
 }
