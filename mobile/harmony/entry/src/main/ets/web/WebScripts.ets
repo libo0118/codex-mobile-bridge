@@ -2,6 +2,7 @@ import common from '@ohos.app.ability.common';
 import util from '@ohos.util';
 import { HARMONY_DISPLAY_STYLE_SCRIPT } from './DisplayStyle';
 import { PROVIDER_SWITCHER_SCRIPT } from './ProviderSwitcher';
+import { codeyUiScript } from './CodeyUi';
 
 export async function loadMobileScripts(context: common.UIAbilityContext): Promise<string> {
   const decoder = util.TextDecoder.create('utf-8');
@@ -23,6 +24,7 @@ export function mobileScript(source: string, token: string, expectedURL: string)
     ${source.replace(new RegExp('__BRIDGE_CLIPBOARD_TOKEN__', 'g'), token)}
     ${HARMONY_DISPLAY_STYLE_SCRIPT}
     ${PROVIDER_SWITCHER_SCRIPT}
+    ${codeyUiScript(expectedURL, token)}
   })()`;
 }
 
@@ -33,6 +35,7 @@ export function uploadGestureScript(token: string): string {
 export const BACK_SCRIPT: string = `(() => {
   const dialog = document.querySelector('dialog[open]');
   if (dialog) { dialog.close(); return true; }
+  if (window.__bridgeHarmonyCodeyUi?.back()) return true;
   if (typeof window.BridgeNavigation?.back === 'function') return window.BridgeNavigation.back();
   if (window.BridgeWorkbench?.back()) return true;
   if (document.getElementById('app')?.classList.contains('chat-open')) { document.getElementById('back')?.click(); return true; }

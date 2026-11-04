@@ -9,8 +9,9 @@ import deviceInfo from '@ohos.deviceInfo';
 import { scanBarcode, scanCore } from '@kit.ScanKit';
 import { Computer, ComputerStore } from '../data/ComputerStore';
 import { DEFAULT_DOWNLOAD_LIMIT_MIB, MAX_DOWNLOAD_LIMIT_MIB, parseDownloadLimitMiB, downloadLimitBytes } from '../data/DownloadSettings';
-import { connectionURL, gatewayConnection, sameGateway, isPreviewShell, acceptsDownload, externalHTTP, validPrompt, chatURL } from '../security/GatewayURL';
+import { newConnectionURL, gatewayConnection, sameGateway, isPreviewShell, acceptsDownload, externalHTTP, validPrompt, chatURL } from '../security/GatewayURL';
 import { loadMobileScripts, mobileScript, uploadGestureScript, BACK_SCRIPT } from '../web/WebScripts';
+import { CodeyUiState, decodeCodeyUiState, codeyUiScript, codeyUiActionScript } from '../web/CodeyUi';
 import { webString } from '../web/DownloadScript';
 import { AttachmentDownload, DownloadFile, selectUpload, saveAttachment, discardAttachment, clearStaleAttachments } from '../web/Files';
 import { ForegroundEvents } from '../notifications/ForegroundEvents';
@@ -64,6 +65,7 @@ struct Index {
   @State downloadSettings: boolean = false;
   @State savingDownloadSettings: boolean = false;
   @State downloadSettingsError: string = '';
+  @State codeyUi: CodeyUiState = new CodeyUiState();
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   private store: ComputerStore = new ComputerStore();
   private controller: webview.WebviewController = new webview.WebviewController();
@@ -80,6 +82,8 @@ struct Index {
   private configGeneration: number = 0;
   private codexTop: string = '#f5f5f3';
   private systemGlass?: SystemGlassAdapter;
+  private menuTarget: string = '';
+  private menuGeneration: number = -1;
 
   aboutToAppear(): void { this.updateBars(this.codexTop); this.initialize(); }
   aboutToDisappear(): void { this.events.stop(); this.cancelDownload(); this.flushCookies(); }
@@ -116,7 +120,7 @@ struct Index {
 
   private foregroundChanged(): void {
     if (!this.foreground) { this.events.stop(); this.interaction = 0; this.flushCookies(); }
-    else this.startEvents();
+    else { this.startEvents(); this.syncCodeyUi(); }
   }
 
   private notificationOpened(): void {
@@ -152,7 +156,7 @@ struct Index {
     this.interaction = 0;
     this.closeServiceConfig();
     this.activeTab = id;
-    if (id === 'codex') { this.updateBars(this.codexTop); this.startEvents(); return; }
+    if (id === 'codex') { this.updateBars(this.codexTop); this.startEvents(); this.syncCodeyUi(); return; }
     this.events.stop();
     this.updateBars('#f5f5f3');
     const site = this.services.find((item: ServiceSite) => item.id === id);
@@ -202,8 +206,8 @@ struct Index {
 
   private choose(value: string): void {
     try {
-      const selected = gatewayConnection(value);
-      const target = connectionURL(value);
+      const target = newConnectionURL(value);
+      const selected = gatewayConnection(target);
       AlertDialog.show({
         title: this.L('连接到这台电脑？', 'Connect to this computer?'),
         message: selected.base + this.L('\n请确认这是你自己的网关。', '\nMake sure this is your own gateway.'),
@@ -258,6 +262,7 @@ struct Index {
     this.cancelDownload();
     this.flushCookies();
     this.connected = false;
+    this.codeyUi = new CodeyUiState();
     this.status = '';
     this.base = '';
     this.target = '';
@@ -298,6 +303,18 @@ struct Index {
       this.computers = this.computers.filter((item: Computer) => item.base !== computer.base);
       await this.store.save(this.computers);
     } catch (error) { this.error(error as Error); }
+  }
+
+  private async syncCodeyUi(): Promise<void> {
+    this.codeyUi = new CodeyUiState();
+    const current = this.currentURL(), ticket = this.generation, token = this.token;
+    if (!this.foreground || !this.connected || this.activeTab !== 'codex' || !token || !sameGateway(current, this.base) || isPreviewShell(current, this.base)) return;
+    try { await this.controller.runJavaScript(codeyUiScript(current, token)); }
+    catch (_) {
+      if (ticket === this.generation && token === this.token && current === this.currentURL() && this.foreground && this.connected && this.activeTab === 'codex') {
+        this.status = this.L('页面适配失败，请在菜单中刷新。', 'Page setup failed. Refresh from the menu.');
+      }
+    }
   }
 
   private async pageFinished(target: string): Promise<void> {
@@ -363,6 +380,10 @@ struct Index {
         this.updateBars(colors.top);
         event.result.handlePromptConfirm('saved');
       } catch (_) { event.result.handleCancel(); }
+    } else if (command === 'codey-ui' && this.activeTab === 'codex' && event.url === this.currentURL()) {
+      const state = decodeCodeyUiState(event.value);
+      if (state) { this.codeyUi = state; event.result.handlePromptConfirm('saved'); }
+      else event.result.handleCancel();
     } else if (command === 'session' || command === 'logout') {
       this.events.stop(); this.flushCookies();
       if (command === 'session') this.startEvents();
@@ -636,6 +657,27 @@ struct Index {
     })()`);
   }
 
+  private captureGatewayMenu(): void {
+    this.menuTarget = this.currentURL();
+    this.menuGeneration = this.generation;
+  }
+
+  private async openCodeyControl(command: string): Promise<void> {
+    const target = this.menuTarget, ticket = this.menuGeneration;
+    if (!this.foreground || !this.connected || this.activeTab !== 'codex' || !this.codeyUi.supported ||
+      ticket !== this.generation || target !== this.currentURL() || !sameGateway(target, this.base) || isPreviewShell(target, this.base)) return;
+    try {
+      const result = await this.controller.runJavaScript(codeyUiActionScript(target, command));
+      if (ticket === this.generation && target === this.currentURL() && this.activeTab === 'codex' && webString(result) !== 'clicked') {
+        promptAction.showToast({ message: this.L('页面入口已变化，请重新打开菜单。', 'Page controls changed. Reopen the menu.') });
+      }
+    } catch (_) {
+      if (ticket === this.generation && target === this.currentURL() && this.activeTab === 'codex') {
+        promptAction.showToast({ message: this.L('页面操作失败，请重新打开菜单后重试。', 'Page action failed. Reopen the menu and retry.') });
+      }
+    }
+  }
+
   onBackPress(): boolean {
     if (this.downloadSettings) { this.closeDownloadSettings(); return true; }
     if (this.navigationSettings) { if (!this.savingNavigation) this.navigationSettings = false; return true; }
@@ -655,10 +697,23 @@ struct Index {
   private gatewayMenu() {
     Menu() {
       MenuItem({ content: this.L('返回电脑列表', 'Computers') }).onClick(() => { this.home(); })
-      MenuItem({ content: this.L('账号管理', 'Accounts') }).onClick(() => { this.openGatewayControl('accounts-button'); })
-      MenuItem({ content: this.L('第三方通知', 'Third-party alerts') }).onClick(() => { this.openGatewayControl('pushplus-settings'); })
-      MenuItem({ content: this.L('应用管理', 'Applications') }).onClick(() => { this.openGatewayControl('clients-button'); })
-      MenuItem({ content: this.L('外观与显示', 'Appearance') }).onClick(() => { this.webAction("document.querySelector('[data-open-appearance]')?.click()"); })
+      if (this.codeyUi.supported) {
+        if (this.codeyUi.chat) {
+          MenuItem({ content: this.L('返回会话列表', 'Back to sessions') }).enabled(this.codeyUi.canBack).onClick(() => { this.openCodeyControl('back'); })
+          ForEach(this.services, (site: ServiceSite) => {
+            MenuItem({ content: this.L('切换到 ', 'Switch to ') + site.name }).onClick(() => { this.selectTab(site.id); })
+          }, (site: ServiceSite) => site.id)
+        }
+        MenuItem({ content: this.L('查看归档会话', 'View archived sessions') }).selected(this.codeyUi.archived).selectIcon(true)
+          .enabled(this.codeyUi.canArchive).onClick(() => { this.openCodeyControl('archive'); })
+        MenuItem({ content: 'Codey 控制台' }).enabled(this.codeyUi.canConsole).onClick(() => { this.openCodeyControl('console'); })
+        MenuItem({ content: this.L('退出此设备', 'Sign out this device') }).enabled(this.codeyUi.canLogout).onClick(() => { this.openCodeyControl('logout'); })
+      } else {
+        MenuItem({ content: this.L('账号管理', 'Accounts') }).onClick(() => { this.openGatewayControl('accounts-button'); })
+        MenuItem({ content: this.L('第三方通知', 'Third-party alerts') }).onClick(() => { this.openGatewayControl('pushplus-settings'); })
+        MenuItem({ content: this.L('应用管理', 'Applications') }).onClick(() => { this.openGatewayControl('clients-button'); })
+        MenuItem({ content: this.L('外观与显示', 'Appearance') }).onClick(() => { this.webAction("document.querySelector('[data-open-appearance]')?.click()"); })
+      }
       MenuItem({ content: this.L('底栏外观', 'Navigation appearance') }).onClick(() => { this.openNavigationSettings(); })
       MenuItem({ content: this.L('下载设置', 'Download settings') }).onClick(() => { this.openDownloadSettings(); })
       MenuItem({ content: this.L('刷新页面', 'Refresh') }).onClick(() => { this.controller.refresh(); })
@@ -714,7 +769,8 @@ struct Index {
               Button(this.L('扫码连接电脑', 'Scan to connect')).height(54).fontSize(16).width('100%').backgroundColor('#202124').fontColor('#ffffff').borderRadius(16).enabled(this.ready).onClick(() => { this.scan(); })
               Button(this.L('输入网关地址', 'Enter gateway address')).height(54).fontSize(16).width('100%').backgroundColor('#f4f5f7').fontColor('#202124').borderRadius(12).enabled(this.ready).onClick(() => { this.manual = !this.manual; })
               if (this.manual) {
-                TextInput({ text: this.address, placeholder: 'https://' }).type(InputType.URL).maxLength(8192).fontSize(16).onChange((value: string) => { this.address = value; })
+                TextInput({ text: this.address, placeholder: this.L('电脑地址:18787 或 https://', 'host:18787 or https://') }).type(InputType.URL).maxLength(8192).fontSize(16).onChange((value: string) => { this.address = value; })
+                Text(this.L('新局域网主机默认 18787；完整网址和已保存连接保持原端口。', 'New LAN hosts use port 18787. Full URLs and saved connections keep their ports.')).fontSize(12).fontColor('#777b80').width('100%')
                 Row({ space: 8 }) {
                   Button(this.L('粘贴', 'Paste')).layoutWeight(1).height(44).backgroundColor('#f4f5f7').fontColor('#202124').borderRadius(12).onClick(() => { this.pasteAddress(); })
                   Button(this.L('继续', 'Continue')).layoutWeight(1).height(44).backgroundColor('#202124').fontColor('#ffffff').borderRadius(12).onClick(() => { this.choose(this.address); })
@@ -741,7 +797,7 @@ struct Index {
               // Older gateways recognize the Android suffix; the first token identifies the real host to newer gateways.
               this.controller.setCustomUserAgent(this.controller.getUserAgent() + ' BridgeMobile/2.1.1-HarmonyOS BridgeMobile/2.1.1-Android');
             })
-            .onPageBegin(() => { this.events.stop(); this.generation++; this.token = util.generateRandomUUID(); this.interaction = 0; this.cancelDownload(); })
+            .onPageBegin(() => { this.events.stop(); this.generation++; this.token = util.generateRandomUUID(); this.interaction = 0; this.codeyUi = new CodeyUiState(); this.cancelDownload(); })
             .onPageEnd((event) => { if (event) this.pageFinished(event.url); })
             .onLoadIntercept((event) => event ? this.intercept(event.data) : true)
             .onPrompt((event) => event ? this.prompt(event) : true)
@@ -754,7 +810,7 @@ struct Index {
             .onKeyEvent((event: KeyEvent) => { if (event.type === KeyType.Up && this.foreground) this.interaction = Date.now(); })
             .width('100%').height('100%')
           Button('•••').width(48).height(48).fontSize(18).fontColor('#777b80').backgroundColor('#f4f5f7').borderRadius(16).margin({ top: 4, right: 8 })
-            .accessibilityText(this.L('电脑与聊天选项', 'Computer and chat options')).bindMenu(this.gatewayMenu)
+            .accessibilityText(this.L('电脑与聊天选项', 'Computer and chat options')).bindMenu(this.gatewayMenu, { onAppear: () => { this.captureGatewayMenu(); } })
         }.width('100%').layoutWeight(1)
         if (this.downloadLabel) {
           Column({ space: 8 }) {
@@ -802,6 +858,7 @@ struct Index {
         }.width('90%').constraintSize({ maxWidth: 380 }).padding(1).attributeModifier(new NavigationChrome())
           .priorityGesture(LongPressGesture({ repeat: false, duration: 600 }).onAction(() => { this.openNavigationSettings(); }))
       }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 2 }).backgroundColor('#FFFFFF')
+        .visibility(this.activeTab === 'codex' && this.connected && this.codeyUi.chat ? Visibility.None : Visibility.Visible)
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
       .bindSheet($$this.navigationSettings, this.navigationSettingsPanel(), { height: '70%', showClose: !this.savingNavigation,
         backgroundColor: '#f5f5f3' })

@@ -7,6 +7,8 @@ const test = require('node:test');
 
 const root = path.join(__dirname, '../harmony/entry/src/main/ets/web');
 const scope = vm.createContext({});
+vm.runInContext(stripTypeScriptTypes(fs.readFileSync(path.join(root, 'CodeyUi.ets'), 'utf8')
+  .replace(/\bexport /g, ''), { mode: 'strip' }), scope);
 vm.runInContext(stripTypeScriptTypes(fs.readFileSync(path.join(root, 'DisplayStyle.ets'), 'utf8')
   .replace(/\bexport /g, ''), { mode: 'strip' }), scope);
 vm.runInContext(stripTypeScriptTypes(fs.readFileSync(path.join(root, 'ProviderSwitcher.ets'), 'utf8')

@@ -15,6 +15,7 @@ function load(relative, names, dependencies = {}) {
 
 const settings = load('data/DownloadSettings.ets', ['DEFAULT_DOWNLOAD_LIMIT_MIB', 'MAX_DOWNLOAD_LIMIT_MIB', 'isDownloadLimitMiB', 'parseDownloadLimitMiB', 'downloadLimitBytes']);
 const appearance = load('appearance/NavigationAppearance.ets', ['NavigationAppearance', 'decodeNavigationAppearance']);
+const { CodeyUiState } = load('web/CodeyUi.ets', ['CodeyUiState']);
 
 function storeHarness(initial = []) {
   const cache = new Map([['computers', '[]'], ['language', 'en'], ['alerts', true], ['navigationAppearance', '{"blur":37}'], ['unrelated', 'keep'], ...initial]);
@@ -76,14 +77,14 @@ test('failed preference put does not replace the original error with rollback er
 });
 
 function pageHarness(extra = {}) {
-  const source = fs.readFileSync(path.join(root, 'pages/Index.ets'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'pages/Index.ets'), 'utf8').replace(/\r\n/g, '\n');
   const segment = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
   const logic = (source.slice(0, source.indexOf('  @Builder')) +
     segment('  private async beginDownload(', '  private async saveDownload(') +
     segment('  onBackPress()', '  @Builder\n  private gatewayMenu()') + '\n}')
     .replace(/^import[^\n]+\n/gm, '').replace(/@\w+(?:\([^()\n]*\))?\s*/g, '').replace('struct Index', 'class Index');
   const stub = class {};
-  const context = vm.createContext({ ...settings, getContext: () => ({}), ComputerStore: stub, ServiceStore: stub,
+  const context = vm.createContext({ ...settings, CodeyUiState, getContext: () => ({}), ComputerStore: stub, ServiceStore: stub,
     ForegroundEvents: stub, webview: { WebviewController: stub }, ...extra });
   vm.runInContext(stripTypeScriptTypes(logic, { mode: 'strip' }) + '\nthis.Page = Index;', context);
   const page = new context.Page();

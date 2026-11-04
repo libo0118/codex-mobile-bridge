@@ -103,6 +103,8 @@ test('explicit credential fill changes a single main-frame form without submitti
 });
 
 const nativeRoot = path.join(__dirname, '../harmony/entry/src/main/ets');
+const codeyScope = vm.createContext({});
+vm.runInContext(stripTypeScriptTypes(fs.readFileSync(path.join(nativeRoot, 'web/CodeyUi.ets'), 'utf8').replace(/\bexport /g, ''), { mode: 'strip' }) + '\nthis.State = CodeyUiState;', codeyScope);
 const filesSource = fs.readFileSync(path.join(nativeRoot, 'web/Files.ets'), 'utf8');
 const downloadSettingsScope = vm.createContext({});
 vm.runInContext(stripTypeScriptTypes(fs.readFileSync(path.join(nativeRoot, 'data/DownloadSettings.ets'), 'utf8').replace(/\bexport /g, ''), { mode: 'strip' }) +
@@ -189,7 +191,7 @@ function componentLogic(relative, name, adapters) {
 function site(id, url) { return { id, name: id.toUpperCase(), url }; }
 function indexLogic() {
   const stub = class {};
-  const page = componentLogic('pages/Index.ets', 'Index', { ...settings, ComputerStore: stub, ServiceStore: stub,
+  const page = componentLogic('pages/Index.ets', 'Index', { ...settings, CodeyUiState: codeyScope.State, ComputerStore: stub, ServiceStore: stub,
     ForegroundEvents: stub, webview: { WebviewController: stub }, promptAction: { showToast() {} },
     ServiceSite: class { constructor(id, name, url) { this.id = id; this.name = name; this.url = url; } } });
   page.error = error => { throw error; };

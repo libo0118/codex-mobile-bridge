@@ -68,6 +68,17 @@ export function connectionURL(value: string): string {
   return result.base + '/' + (result.fragment ? '#' + result.fragment : '');
 }
 
+export function newConnectionURL(value: string): string {
+  const clean = value.trim();
+  if (new RegExp('^https?://', 'i').test(clean)) return connectionURL(clean);
+  const address = parse('https://' + clean);
+  const local = localHost(address.host);
+  const authority = address.origin.substring('https://'.length);
+  return connectionURL((local ? 'http://' : 'https://') + authority +
+    (local && authority === address.host ? ':18787' : '') + address.path +
+    (address.hasQuery ? '?' + address.query : '') + (address.hasFragment ? '#' + address.fragment : ''));
+}
+
 export function sameGateway(target: string, base: string): boolean {
   try {
     const selected = gatewayConnection(base);
@@ -143,7 +154,7 @@ export function chatURL(base: string, thread: string, host: string): string {
 export function validPrompt(message: string, token: string, source: string, current: string, base: string): string {
   if (!token || !sameGateway(source, base) || !sameGateway(current, base) ||
     isPreviewShell(source, base) || isPreviewShell(current, base)) return '';
-  for (const command of ['computer', 'copy', 'language', 'system-bars', 'session', 'auth-lost', 'logout']) {
+  for (const command of ['computer', 'copy', 'language', 'system-bars', 'session', 'auth-lost', 'logout', 'codey-ui']) {
     if (message === 'codexbridge-' + command + ':' + token) return command;
   }
   return '';
