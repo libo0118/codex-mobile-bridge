@@ -37,7 +37,7 @@ export function credentialScope(configuredUrl: string): string {
 }
 
 function checkService(serviceId: string): void {
-  if (serviceId !== 'keeper' && serviceId !== 'cpa' && serviceId !== 'magpie') throw new Error('管理站点无效');
+  if (serviceId !== 'keeper' && serviceId !== 'cpa' && serviceId !== 'magpie' && serviceId !== 'chat') throw new Error('管理站点无效');
 }
 
 function checkedCredential(scope: string, username: string, secret: string, kind: CredentialKind): ServiceCredential {

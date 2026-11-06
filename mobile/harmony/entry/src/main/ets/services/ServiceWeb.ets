@@ -1,12 +1,13 @@
 import common from '@ohos.app.ability.common';
 import webview from '@ohos.web.webview';
-import { ServiceSite } from './ServiceSite';
+import { ServiceSite, serviceCredentialURL } from './ServiceSite';
 import { httpsOrigin, externalHTTP, credentialScopeMatches } from '../security/GatewayURL';
 import { ServiceCredentials } from './ServiceCredentials';
 import { webString } from '../web/DownloadScript';
 import { credentialFillScript } from './CredentialFill';
 import { CredentialKind } from './CredentialVault';
 import { keeperPage, keeperUiScript } from './KeeperUi';
+import { chatUiScript } from './ChatUi';
 
 @Component
 export struct ServiceWeb {
@@ -21,6 +22,7 @@ export struct ServiceWeb {
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   private controller: webview.WebviewController = new webview.WebviewController();
   private initialURL: string = '';
+  private chatInitial: boolean = true;
   private backGeneration: number = 0;
 
   aboutToAppear(): void { this.initialURL = this.site.url; }
@@ -59,6 +61,19 @@ export struct ServiceWeb {
     } catch (_) {}
   }
 
+  private chatCommand(): void {
+    if (this.site.id !== 'chat') return;
+    try {
+      const current = this.controller.getUrl();
+      if (!this.allowed(current)) return;
+      this.controller.runJavaScript(chatUiScript(current, this.initialURL, this.chatInitial)).then((result: string): void => {
+        if (webString(result) === 'ready') this.chatInitial = false;
+      }).catch((): void => {
+        if (this.active && this.currentURL === current) this.status = 'Chat 页面适配失败，请手动刷新。';
+      });
+    } catch (_) { if (this.active) this.status = 'Chat 页面适配失败，请手动刷新。'; }
+  }
+
   private requestBack(): void {
     if (!this.active || this.site.id !== 'keeper') return;
     const ticket = ++this.backGeneration;
@@ -95,13 +110,13 @@ export struct ServiceWeb {
   private async fill(username: string, secret: string, scope: string, kind: CredentialKind): Promise<void> {
     const current = this.controller.getUrl();
     if (!this.active || !secret || secret.length > (kind === 'entry-link' ? 8192 : 4096) || username.length > 512 ||
-      !credentialScopeMatches(current, scope, this.site.url)) {
+      !credentialScopeMatches(current, scope, serviceCredentialURL(this.site))) {
       AlertDialog.show({ message: '当前页面与保存的登录范围不匹配，未填入登录信息。', confirm: { value: '好', action: () => {} } });
       return;
     }
     try {
       if (kind === 'entry-link') {
-        if (!credentialScopeMatches(secret, scope, this.site.url)) throw new Error('私密入口不属于当前站点');
+        if (!credentialScopeMatches(secret, scope, serviceCredentialURL(this.site))) throw new Error('私密入口不属于当前站点');
         this.controller.loadUrl(secret);
         return;
       }
@@ -137,9 +152,9 @@ export struct ServiceWeb {
         .onLoadIntercept((event) => event ? this.navigate(event.data) : true)
         .onPageBegin((event) => { if (event) { this.currentURL = event.url; this.status = ''; } })
         .onPageEnd((event) => {
-          if (event && this.allowed(event.url)) { this.currentURL = event.url; webview.WebCookieManager.saveCookieAsync().catch(() => {}); this.keeperCommand(); }
+          if (event && this.allowed(event.url)) { this.currentURL = event.url; webview.WebCookieManager.saveCookieAsync().catch(() => {}); this.keeperCommand(); this.chatCommand(); }
         })
-        .onRefreshAccessedHistory((event) => { if (event) { this.currentURL = event.url; this.keeperCommand(); } })
+        .onRefreshAccessedHistory((event) => { if (event) { this.currentURL = event.url; this.keeperCommand(); this.chatCommand(); } })
         .onErrorReceive((event) => { if (event && event.request.isMainFrame()) this.status = '连接失败，请检查网络后手动刷新。'; })
         .width('100%').layoutWeight(1)
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
@@ -148,7 +163,7 @@ export struct ServiceWeb {
   build() {
     Stack({ alignContent: Alignment.TopEnd }) {
       this.servicePage()
-      ServiceCredentials({ serviceId: this.site.id, configuredUrl: this.site.url, currentUrl: this.currentURL, active: this.active,
+      ServiceCredentials({ serviceId: this.site.id, configuredUrl: serviceCredentialURL(this.site), currentUrl: this.currentURL, active: this.active,
         compactTrigger: true, openRequest: this.loginRequest,
         onFill: (username: string, secret: string, scope: string, kind: CredentialKind) => { this.fill(username, secret, scope, kind); } })
     }.width('100%').height('100%')

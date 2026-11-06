@@ -106,7 +106,7 @@ test('startup cleanup is one time per process and never touches other caches', (
 
 function pageHarness(options = {}) {
   const source = read('pages/Index.ets');
-  const method = source.match(/  private async upload\(event: OnShowFileSelectorEvent\): Promise<void> \{[\s\S]*?\n  \}/)[0];
+  const method = source.match(/  private async upload\(event: OnShowFileSelectorEvent, session: GatewaySession\): Promise<void> \{[\s\S]*?\n  \}/)[0];
   const calls = [], replies = [];
   const scope = vm.createContext({
     FileSelectorMode: { FileOpenMode: 0, FileOpenMultipleMode: 1, FileOpenFolderMode: 2, FileSaveMode: 3 },
@@ -122,7 +122,9 @@ function pageHarness(options = {}) {
   const page = new scope.Page();
   Object.assign(page, { generation: 1, base: 'http://gateway:18787', activeTab: 'codex', foreground: true, token: 'token', context: {},
     currentURL: () => page.url, url: 'http://gateway:18787/#first', L: (zh) => zh,
+    interactiveGateway: () => true,
     controller: { runJavaScript: async () => { if (options.gesture) return options.gesture(); return '"true"'; } } });
+  const upload = page.upload.bind(page); page.upload = event => upload(event, {});
   const event = { fileSelector: { getMode: () => options.mode ?? 0, isCapture: () => !!options.isCapture, getAcceptType: () => options.types ?? [] },
     result: { handleFileList: list => { replies.push(Array.from(list)); if (options.callbackError) throw Error('callback error'); } } };
   return { page, event, calls, replies };

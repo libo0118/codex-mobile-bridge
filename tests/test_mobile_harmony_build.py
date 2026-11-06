@@ -65,6 +65,8 @@ class HarmonyBuildTests(unittest.TestCase):
         self.assertEqual((self.root / BUILDER.PROJECT / 'AppScope/resources/base/media/app_icon.png').read_bytes(), (ROOT / BUILDER.ICON_SOURCE).read_bytes())
 
     def test_missing_or_invalid_packaged_branding_is_rejected(self):
+        self.assertIn('nav_chat.svg', BUILDER.NAV_ICONS)
+        self.assertIn('nav_chat_selected.svg', BUILDER.NAV_ICONS)
         for name in ('app_icon.png',) + BUILDER.NAV_ICONS:
             with self.subTest(name=name), self.assertRaisesRegex(RuntimeError, 'Missing packaged HarmonyOS icon'):
                 BUILDER.verify_hap(self.hap(missing='resources/base/media/' + name), self.root, self.app)

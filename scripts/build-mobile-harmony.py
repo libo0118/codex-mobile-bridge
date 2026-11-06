@@ -17,7 +17,7 @@ SHARED_SCRIPTS = ('mobile-ui.js', 'mobile-clipboard.js', 'mobile-system-bars.js'
 BUNDLE_NAME = 'io.github.try2love.codexbridge.harmony'
 ICON_SOURCE = PROJECT / 'branding/app-1024.png'
 NAV_ICONS = tuple('nav_' + name + suffix + '.svg'
-                  for name in ('codex', 'keeper', 'cpa', 'magpie') for suffix in ('', '_selected'))
+                  for name in ('codex', 'keeper', 'cpa', 'magpie', 'chat') for suffix in ('', '_selected'))
 
 
 def read_json(path):
