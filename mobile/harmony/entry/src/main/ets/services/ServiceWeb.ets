@@ -9,6 +9,7 @@ import { credentialFillScript } from './CredentialFill';
 import { CredentialKind } from './CredentialVault';
 import { keeperPage, keeperUiScript } from './KeeperUi';
 import { chatUiScript, chatUiActionScript } from './ChatUi';
+import { magpieUiScript } from './MagpieUi';
 
 @Component
 export struct ServiceWeb {
@@ -23,6 +24,8 @@ export struct ServiceWeb {
   @State loginRequest: number = 0;
   @State chatMode: boolean = false;
   @State chatReady: boolean = false;
+  @State chatListHeader: boolean = false;
+  @State magpieReady: boolean = false;
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   private controller: webview.WebviewController = new webview.WebviewController();
   private initialURL: string = '';
@@ -39,6 +42,7 @@ export struct ServiceWeb {
     this.chatToken = '';
     this.chatMode = false;
     this.chatReady = false;
+    this.chatListHeader = false;
     if (this.site.id === 'chat') this.onChatMode(false);
   }
 
@@ -48,6 +52,7 @@ export struct ServiceWeb {
   }
 
   private activeChanged(): void {
+    if (this.site.id === 'magpie') { if (this.active) this.magpieCommand(); return; }
     if (this.site.id !== 'chat') return;
     const oldToken = this.chatToken, current = this.currentURL;
     this.newChatToken();
@@ -106,6 +111,20 @@ export struct ServiceWeb {
     } catch (_) { if (this.active && ticket === this.chatGeneration) this.status = 'Chat 页面适配失败，请手动刷新。'; }
   }
 
+  private magpieCommand(action: string = ''): void {
+    if (this.site.id !== 'magpie' || !this.active) return;
+    const current = this.currentURL;
+    try {
+      if (this.controller.getUrl() !== current) return;
+      this.controller.runJavaScript(magpieUiScript(current, this.initialURL, action)).then((result: string): void => {
+        if (!this.active || this.currentURL !== current || this.controller.getUrl() !== current) return;
+        const value = webString(result);
+        if (!action) this.magpieReady = value === 'ready';
+        else if (value !== 'clicked') this.status = 'Magpie 页面操作不可用，请刷新页面后重试。';
+      }).catch((): void => { if (this.active && this.currentURL === current) this.status = 'Magpie 页面适配失败，请在菜单中刷新。'; });
+    } catch (_) { if (this.active && this.currentURL === current) this.status = 'Magpie 页面适配失败，请在菜单中刷新。'; }
+  }
+
   private chatAction(action: string): void {
     if (!this.active || this.site.id !== 'chat' || !this.chatToken) return;
     const current = this.currentURL, token = this.chatToken, ticket = this.chatGeneration;
@@ -139,9 +158,10 @@ export struct ServiceWeb {
     if (base !== '' && this.active && this.site.id === 'chat' && this.site.enabled !== false && this.site.url === this.initialURL &&
       this.chatToken && event.message === 'bridge-chat-ui:' + this.chatToken &&
       event.url === current && this.currentURL === current &&
-      (current === this.initialURL && (event.value === 'list' || event.value === 'chat') || fallback && event.value === 'list')) {
+      (current === this.initialURL && ['list', 'chat', 'list-header', 'chat-header'].indexOf(event.value) >= 0 || fallback && event.value === 'list')) {
       this.chatReady = current === this.initialURL;
-      this.chatMode = event.value === 'chat';
+      this.chatMode = event.value === 'chat' || event.value === 'chat-header';
+      this.chatListHeader = event.value === 'list-header' || event.value === 'chat-header';
       this.onChatMode(this.chatMode);
       event.result.handlePromptConfirm('saved');
     } else event.result.handleCancel();
@@ -182,6 +202,10 @@ export struct ServiceWeb {
         MenuItem({ content: '对话设置' }).onClick(() => { this.chatAction('settings'); })
         MenuItem({ content: '登录信息' }).onClick(() => { if (this.active) this.loginRequest++; })
       }
+      if (this.site.id === 'magpie') {
+        MenuItem({ content: '网页返回' }).onClick(() => { this.back(); })
+        MenuItem({ content: '登录信息' }).onClick(() => { if (this.active) this.loginRequest++; })
+      }
       MenuItem({ content: '刷新页面' }).onClick(() => { if (this.active) this.controller.refresh(); })
       MenuItem({ content: '站点设置' }).onClick(() => { if (this.active) this.onConfigure(); })
     }
@@ -219,7 +243,26 @@ export struct ServiceWeb {
         }
         Text(this.site.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
           .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        if (this.site.id !== 'chat' || !this.chatReady) {
+        if (this.site.id === 'chat' && this.chatListHeader && !this.chatMode) {
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Image($r('app.media.service_header_new')).width(24).height(24).objectFit(ImageFit.Contain)
+          }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
+            .accessibilityText('新建对话').onClick(() => { this.chatAction('new'); })
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Image($r('app.media.service_header_settings')).width(24).height(24).objectFit(ImageFit.Contain)
+          }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
+            .accessibilityText('对话设置').onClick(() => { this.chatAction('settings'); })
+        }
+        if (this.site.id === 'magpie') {
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Image($r('app.media.service_header_refresh')).width(24).height(24).objectFit(ImageFit.Contain)
+          }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active && this.magpieReady)
+            .accessibilityText('刷新 Magpie').onClick(() => { this.magpieCommand('refresh'); })
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Image($r('app.media.service_header_settings')).width(24).height(24).objectFit(ImageFit.Contain)
+          }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active && this.magpieReady)
+            .accessibilityText('Magpie 设置').onClick(() => { this.magpieCommand('settings'); })
+        } else if (this.site.id !== 'chat' || !this.chatReady) {
           Button({ type: ButtonType.Normal, stateEffect: true }) {
             Image($r('app.media.keeper_header_back')).width(24).height(24).objectFit(ImageFit.Contain)
           }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
@@ -239,12 +282,12 @@ export struct ServiceWeb {
         .javaScriptAccess(true).domStorageAccess(true).fileAccess(false).mixedMode(MixedMode.None).multiWindowAccess(false).geolocationAccess(false)
         .onLoadIntercept((event) => event ? this.navigate(event.data) : true)
         .onPrompt((event) => event ? this.chatPrompt(event) : true)
-        .onPageBegin((event) => { if (event) { if (this.site.id === 'chat') this.newChatToken(); this.currentURL = event.url; this.status = ''; } })
+        .onPageBegin((event) => { if (event) { if (this.site.id === 'chat') this.newChatToken(); this.magpieReady = false; this.currentURL = event.url; this.status = ''; } })
         .onPageEnd((event) => {
           if (event && this.allowed(event.url)) {
             let current = event.url;
             if (this.site.id === 'chat') { try { current = this.controller.getUrl(); } catch (_) { current = ''; } }
-            if (event.url === current) { this.currentURL = event.url; webview.WebCookieManager.saveCookieAsync().catch(() => {}); this.keeperCommand(); this.chatCommand(); }
+            if (event.url === current) { this.currentURL = event.url; webview.WebCookieManager.saveCookieAsync().catch(() => {}); this.keeperCommand(); this.chatCommand(); this.magpieCommand(); }
           }
         })
         .onRefreshAccessedHistory((event) => {
@@ -255,7 +298,7 @@ export struct ServiceWeb {
               if (current !== event.url) return;
             }
             if (this.site.id === 'chat' && event.url !== this.currentURL) this.newChatToken();
-            this.currentURL = event.url; this.keeperCommand(); this.chatCommand();
+            this.currentURL = event.url; this.keeperCommand(); this.chatCommand(); this.magpieCommand();
           }
         })
         .onErrorReceive((event) => {

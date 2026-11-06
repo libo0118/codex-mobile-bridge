@@ -19,7 +19,7 @@ import { ForegroundEvents } from '../notifications/ForegroundEvents';
 import { ServiceSite, ServiceStore } from '../services/ServiceSite';
 import { ServiceWeb } from '../services/ServiceWeb';
 import { NavigationAppearance } from '../appearance/NavigationAppearance';
-import { detectSystemGlass, NavigationChrome, NavigationMaterial, SystemGlassAdapter, SystemGlassModule } from '../appearance/NavigationMaterial';
+import { detectSystemGlass, NavigationMaterial, SystemGlassAdapter, SystemGlassModule } from '../appearance/NavigationMaterial';
 
 class BarColors {
   top: string = '';
@@ -659,15 +659,10 @@ struct Index {
     Scroll() {
       Column({ space: 16 }) {
         Text(this.L('底栏外观', 'Navigation appearance')).fontSize(23).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%')
-        Row() {
-          Row() {
-            Row({ space: 8 }) {
-              Image($r('app.media.nav_codex_selected')).width(24).height(24)
-              Text('Codex+').fontSize(16).fontWeight(FontWeight.Medium).fontColor('#303640')
-            }.width('100%').constraintSize({ minHeight: 52 }).justifyContent(FlexAlign.Center)
-              .borderRadius(999).clip(true).attributeModifier(this.navigationMaterial())
-          }.width('85%').padding(1).attributeModifier(new NavigationChrome())
-        }.constraintSize({ minHeight: 76 }).width('100%').justifyContent(FlexAlign.Center)
+        Row({ space: 8 }) {
+          Image($r('app.media.nav_codex_selected')).width(24).height(24)
+          Text('Codex').fontSize(12).fontColor('#303640')
+        }.width('100%').height(56).justifyContent(FlexAlign.Center).clip(true).attributeModifier(this.navigationMaterial())
         Row({ space: 12 }) {
           Text(this.L('系统沉浸材质', 'System immersive material')).fontSize(16).fontColor('#202124').layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.editNavigationSystem && this.systemGlassAvailable })
@@ -711,16 +706,16 @@ struct Index {
   @Builder
   private navigationItem(id: string, label: string) {
     Button({ type: ButtonType.Normal }) {
-      Column({ space: this.activeTab === 'chat' ? 2 : 4 }) {
+      Column({ space: 2 }) {
         Image(this.navigationIcon(id)).width(24).height(24).objectFit(ImageFit.Contain)
           .draggable(false).accessibilityLevel('no')
         Text(label).width('100%').fontSize(12).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .textAlign(TextAlign.Center).fontWeight(this.activeTab === id ? FontWeight.Medium : FontWeight.Normal)
           .fontColor(this.activeTab === id ? '#0A59F7' : '#303640')
       }.width('100%').justifyContent(FlexAlign.Center)
-    }.layoutWeight(1).constraintSize({ minWidth: 44, minHeight: this.activeTab === 'chat' ? 52 : 60 })
-      .padding({ left: 3, right: 3, top: this.activeTab === 'chat' ? 4 : 8, bottom: this.activeTab === 'chat' ? 4 : 8 })
-      .backgroundColor(Color.Transparent).borderRadius(30)
+    }.layoutWeight(1).constraintSize({ minWidth: 44 }).height(56)
+      .padding({ left: 3, right: 3, top: 4, bottom: 4 })
+      .backgroundColor(Color.Transparent).borderRadius(0)
       .accessibilityGroup(true).accessibilityText(label + (this.activeTab === id ? this.L('，已选中', ', selected') : ''))
       .onClick(() => { this.selectTab(id); })
   }
@@ -898,11 +893,12 @@ struct Index {
         MenuItem({ content: this.L('连接电脑 · ', 'Connect computer · ') + computer.name })
           .onClick(() => { this.connect(computer.base + '/'); })
       }, (computer: Computer) => computer.base)
+      MenuItem({ content: 'CPA' }).onClick(() => { this.selectTab('cpa'); })
       MenuItem({ content: this.L('Chat 设置', 'Chat settings') }).onClick(() => { this.configureChat(); })
       if (this.codeyUi.supported) {
         if (this.codeyUi.chat) {
           MenuItem({ content: this.L('返回会话列表', 'Back to sessions') }).enabled(this.codeyUi.canBack).onClick(() => { this.openCodeyControl('back'); })
-          ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false), (site: ServiceSite) => {
+          ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false && site.id !== 'cpa'), (site: ServiceSite) => {
             MenuItem({ content: this.L('切换到 ', 'Switch to ') + site.name }).onClick(() => { this.selectTab(site.id); })
           }, (site: ServiceSite) => site.id)
         }
@@ -924,6 +920,15 @@ struct Index {
         this.message(this.L('Codex Mobile Bridge 2.1.1 · HarmonyOS\n聊天、配对与文件管理沿用电脑网关。任务通知仅当前电脑、App 前台有效；首版不含后台推送和设备密钥凭据恢复。下一次附件下载上限：',
           'Codex Mobile Bridge 2.1.1 · HarmonyOS\nChats, pairing and files use your gateway. Alerts run for the current computer while this app is visible. Background push and encrypted credential recovery are not included. Next attachment limit: ') + this.downloadLimitMiB.toString() + ' MB.');
       })
+    }
+  }
+
+  @Builder
+  private computerMenu() {
+    Menu() {
+      MenuItem({ content: 'CPA' }).onClick(() => { this.selectTab('cpa'); })
+      MenuItem({ content: this.L('Chat 设置', 'Chat settings') }).onClick(() => { this.configureChat(); })
+      MenuItem({ content: this.L('底栏外观', 'Navigation appearance') }).onClick(() => { this.openNavigationSettings(); })
     }
   }
 
@@ -962,6 +967,8 @@ struct Index {
           Text('Codex Bridge').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#202124').layoutWeight(1)
           Button(this.language === 'en' ? '中文' : 'EN').height(44).backgroundColor(Color.Transparent).fontColor('#777b80')
             .onClick(() => { this.language = this.language === 'en' ? 'zh' : 'en'; this.store.language(this.language).catch(() => {}); })
+          Button('•••').width(44).height(44).backgroundColor(Color.Transparent).fontColor('#777b80')
+            .accessibilityText(this.L('电脑与页面选项', 'Computer and page options')).bindMenu(this.computerMenu)
         }.height(56).padding({ left: 20, right: 12 })
         Scroll() {
           Column({ space: 16 }) {
@@ -1067,17 +1074,12 @@ struct Index {
         .bindSheet($$this.downloadSettings, this.downloadSettingsPanel(), { height: '70%', showClose: !this.savingDownloadSettings,
           backgroundColor: '#f5f5f3', onWillDismiss: (action: DismissSheetAction) => { this.dismissDownloadSettings(action); } })
       Row() {
-        Row() {
-          Row({ space: 2 }) {
-            this.navigationItem('codex', 'Codex')
-            ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false), (site: ServiceSite) => {
-              this.navigationItem(site.id, site.name)
-            }, (site: ServiceSite) => site.id)
-          }.padding({ left: 5, right: 5, top: this.activeTab === 'chat' ? 2 : 4, bottom: this.activeTab === 'chat' ? 2 : 4 }).width('100%')
-            .borderRadius(999).clip(true).attributeModifier(this.navigationMaterial())
-        }.width('96%').constraintSize({ maxWidth: 440 }).padding(1).attributeModifier(new NavigationChrome())
-          .priorityGesture(LongPressGesture({ repeat: false, duration: 600 }).onAction(() => { this.openNavigationSettings(); }))
-      }.width('100%').justifyContent(FlexAlign.Center).padding({ top: this.activeTab === 'chat' ? 2 : 12, bottom: 2 }).backgroundColor('#FFFFFF')
+        this.navigationItem('codex', 'Codex')
+        ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false && site.id !== 'cpa'), (site: ServiceSite) => {
+          this.navigationItem(site.id, site.name)
+        }, (site: ServiceSite) => site.id)
+      }.width('100%').height(56).backgroundColor('#F7F7F7').clip(true).attributeModifier(this.navigationMaterial())
+        .priorityGesture(LongPressGesture({ repeat: false, duration: 600 }).onAction(() => { this.openNavigationSettings(); }))
         .visibility((this.activeTab === 'codex' && this.connected && this.codeyUi.chat) ||
           (this.activeTab === 'chat' && !this.configId && this.chatInConversation) ? Visibility.None : Visibility.Visible)
     }.width('100%').height('100%').backgroundColor('#f5f5f3')

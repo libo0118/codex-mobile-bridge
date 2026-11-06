@@ -158,7 +158,7 @@ test('page-state payload is boolean-only; new native prompt keeps the token and 
 });
 
 const index = read('pages/Index.ets');
-const dockExpression = index.slice(index.indexOf("}.width('100%').justifyContent(FlexAlign.Center).padding({ top: this.activeTab === 'chat' ? 2 : 12"))
+const dockExpression = index.slice(index.lastIndexOf("this.navigationItem('codex', 'Codex')"))
   .match(/\.visibility\(([\s\S]*?)\)\r?\n/)[1];
 const promptMethod = index.match(/  private prompt\(event: OnPromptEvent\): boolean \{[\s\S]*?\n  \}/)[0];
 vm.runInContext(strip('class NativePrompt {\n'+promptMethod+'\n}\nthis.NativePrompt = NativePrompt;'),api);

@@ -13,7 +13,7 @@ Status: implemented
 - 仅当 Chat 实例的配置明确要求 `view=plugin-chat` 时，主框架识别 `#view-plugin-chat > iframe.plugin-frame` 并调整外层留白和最小高度，不修改 iframe 的 `sandbox`、URL、权限或内部页面。用户点击其他页面后不持续强制切回。
 - 对确认部署页面的首次插件注册竞态，初始化期间仅在同一路径的当前视图及其插件导航按钮均可识别时点击一次；脚本安装前若标准 `navigator.userActivation.hasBeenActive` 已记录用户动作，或安装后发生真实用户操作、离开目标页面或 15 秒超时，均取消等待。该点击只选择原页面，不发送消息或调用聊天接口。
 - 只有配置的 Chat URL、选中的插件导航、未隐藏的 Chat 视图、`#view-plugin-chat > iframe.plugin-frame` 与 `allow-scripts` sandbox 均已识别时，窄屏才隐藏 Magpie 外层 `body.web > header.top` 和 `#nav`；其他视图及登录页不隐藏。外层 flex 布局将回收的空间交给原 iframe，不进入其 DOM。
-- 父页面使用独立随机 nonce 与该 opaque iframe 交换 `bridge-chat-ui` v1 UI 状态，只接受来源为该 frame、origin 为 `null`、nonce 和字段完全匹配的 `list` / `chat`；操作只允许 `back` / `settings`。本机单独生成的文档 token 不传给 iframe，原生 prompt 再校验当前站点、启用状态、代次对应 token、事件和控制器的完整 URL。已识别同路径回退视图只可确认 `list`，用于首屏切换前核对仍为当前页面。
+- 父页面使用独立随机 nonce 与该 opaque iframe 交换 `bridge-chat-ui` v1 UI 状态，只接受来源为该 frame、origin 为 `null`、nonce 和字段完全匹配的 `list` / `chat`；操作只允许 `back` / `settings` / `new`，新建复用子页原逻辑而不发送消息。已发布 build 42 与插件 mobile.3 的四字段回执继续有效；新 bind 的可选 `nativeListHeader` 布尔值由支持它的插件回传，只有 true 回执确认后 Native 才显示替代列表头的新建／设置。新插件未收到这个可选字段时不隐藏列表头，也不增加回执字段。本机单独生成的文档 token 不传给 iframe，原生 prompt 再校验当前站点、启用状态、代次对应 token、事件和控制器的完整 URL。已识别同路径回退视图只可确认 `list`，用于首屏切换前核对仍为当前页面。
 - 接管先发送 `bind(nativeNavigation:false)`，插件报告状态且当前 Native 确认后才发送 `bind(nativeNavigation:true)`；失败或操作无回报时显示底栏并请求恢复子页返回。超时后的旧 `chat` 回报不能立刻再次接管，直到重新加载或子页返回列表。导航、停用、卸载及错误清除本机状态；不靠轮询维护状态。
 
 ## Existing-note audit
@@ -42,4 +42,4 @@ Status: implemented
 
 [HTML 标准](https://html.spec.whatwg.org/multipage/interaction.html#dom-useractivation-hasbeenactive)定义的 sticky activation 能记录脚本安装前的用户交互；当前未在目标 ArkWeb 实机验证该属性的实现和时序。如果运行时不提供此属性，安装前极快切页仍无法与站点自动回退区分；安装后交互继续由事件取消等待。
 
-Node/Mock 不代表 ArkTS 编译、真实鸿蒙设备或实际 Chat 端到端验证；当前不自动发送聊天消息、不安装或发布 HAP。
+Node/Mock 不代表 ArkTS 编译或真实鸿蒙设备；当前不自动发送真实聊天消息、不安装 HAP。原生工具栏与四入口尺寸见[统一紧凑导航](2026-11-06-harmony-flat-navigation.md)。

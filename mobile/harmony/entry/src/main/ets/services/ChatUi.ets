@@ -22,10 +22,10 @@ export function chatUiScript(expectedURL: string, configuredURL: string, initial
     function post(action, nativeNavigation){
       if(!frame||!frame.contentWindow||!nonce)return;
       const message={type:'bridge-chat-ui',v:1,nonce,action};
-      if(action==='bind')message.nativeNavigation=nativeNavigation;
+      if(action==='bind'){message.nativeNavigation=nativeNavigation;message.nativeListHeader=nativeNavigation;}
       frame.contentWindow.postMessage(message,'*');
     }
-    function report(mode){return view()&&window.prompt('bridge-chat-ui:'+token,mode)==='saved';}
+    function report(mode,header=false){return view()&&window.prompt('bridge-chat-ui:'+token,header?mode+'-header':mode)==='saved';}
     function release(){
       clearTimeout(watchdog);
       if(frame){if(handed)post('bind',false);frame.removeEventListener('load',reload);}
@@ -58,11 +58,12 @@ export function chatUiScript(expectedURL: string, configuredURL: string, initial
     window.addEventListener('message',event=>{
       const m=event.data;
       if(!token||!frame||currentFrame()!==frame||event.source!==frame.contentWindow||event.origin!=='null'||!m||typeof m!=='object'||
-        Object.keys(m).sort().join(',')!=='mode,nonce,type,v'||m.type!=='bridge-chat-ui'||m.v!==1||m.nonce!==nonce||
+        !['mode,nonce,type,v','mode,nativeListHeader,nonce,type,v'].includes(Object.keys(m).sort().join(','))||
+        ('nativeListHeader' in m&&typeof m.nativeListHeader!=='boolean')||m.type!=='bridge-chat-ui'||m.v!==1||m.nonce!==nonce||
         (m.mode!=='list'&&m.mode!=='chat'))return;
       if(failed){if(m.mode!=='list')return;failed=false;}
       clearTimeout(watchdog);
-      const accepted=report(m.mode);
+      const accepted=report(m.mode,m.nativeListHeader===true);
       if(accepted&&!handed){handed=true;post('bind',true);}
       else if(!accepted&&handed){handed=false;post('bind',false);}
     });
@@ -72,7 +73,7 @@ export function chatUiScript(expectedURL: string, configuredURL: string, initial
     window.__bridgeChatUiV1={
       refresh(next){release();token=next;sync();},
       action(current,command){
-        if(!token||current!==token||!frame||currentFrame()!==frame||!handed||!['back','settings'].includes(command))return 'unavailable';
+        if(!token||current!==token||!frame||currentFrame()!==frame||!handed||!['back','settings','new'].includes(command))return 'unavailable';
         clearTimeout(watchdog);post(command);
         watchdog=setTimeout(()=>{handed=false;failed=true;report('list');post('bind',false);},1500);
         return 'sent';
@@ -84,7 +85,7 @@ export function chatUiScript(expectedURL: string, configuredURL: string, initial
 }
 
 export function chatUiActionScript(expectedURL: string, token: string, action: string): string {
-  if (!new RegExp('^[0-9a-f]{32}$').test(token) || ['back', 'settings', 'suspend'].indexOf(action) < 0) return '"unavailable"';
+  if (!new RegExp('^[0-9a-f]{32}$').test(token) || ['back', 'settings', 'new', 'suspend'].indexOf(action) < 0) return '"unavailable"';
   return `(function(){
     if(window!==window.top||location.href!==${JSON.stringify(expectedURL)}||!window.__bridgeChatUiV1)return 'unavailable';
     ${action === 'suspend' ? 'window.__bridgeChatUiV1.suspend(' + JSON.stringify(token) + ');return \'sent\';' :

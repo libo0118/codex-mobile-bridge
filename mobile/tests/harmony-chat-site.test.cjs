@@ -253,6 +253,28 @@ test('rejected or lost native acknowledgement restores child navigation and stal
   assert.equal(p.calls.prompts.length, left);
 });
 
+test('list header handoff is optional for published plugins and accepts only its boolean receipt', () => {
+  const p = page(defaultURL, defaultURL, {frame:true}); p.run();
+  const bind = p.calls.messages.at(-1).message;
+  assert.equal(bind.nativeListHeader, false);
+  const mode = {type:'bridge-chat-ui',v:1,nonce:bind.nonce,mode:'list'};
+  p.message(mode);
+  assert.equal(p.calls.prompts.at(-1).value, 'list', 'published plugin 3 retains its own list controls');
+  assert.equal(p.calls.messages.at(-1).message.nativeListHeader, true);
+  p.message({...mode,nativeListHeader:true});
+  assert.equal(p.calls.prompts.at(-1).value, 'list-header');
+  assert.equal(p.action('new'), 'sent');
+  assert.equal(p.calls.messages.at(-1).message.action, 'new');
+  const count = p.calls.prompts.length;
+  p.message({...mode,nativeListHeader:'true'});
+  p.message({...mode,nativeListHeader:true,extra:'rejected'});
+  assert.equal(p.calls.prompts.length, count);
+  p.message({...mode,mode:'chat',nativeListHeader:true});
+  assert.equal(p.calls.prompts.at(-1).value, 'chat-header');
+  p.message(mode);
+  assert.equal(p.calls.prompts.at(-1).value, 'list', 'legacy receipt does not claim native list controls');
+});
+
 test('removed frames and modified sandbox cannot report state even before the mutation observer runs', () => {
   const p = page(defaultURL, defaultURL, {frame:true}); p.run();
   const nonce = p.calls.messages[0].message.nonce, data = {type:'bridge-chat-ui',v:1,nonce,mode:'chat'};
@@ -325,6 +347,10 @@ test('real native prompt and injected script require the current Chat document, 
   p.frame(true); p.sync();
   const rebound = p.calls.messages.at(-1).message.nonce;
   p.message({type:'bridge-chat-ui',v:1,nonce:rebound,mode:'chat'}); assert.equal(service.chatMode,true);
+  p.message({type:'bridge-chat-ui',v:1,nonce:rebound,mode:'list',nativeListHeader:true});
+  assert.equal(service.chatListHeader,true); assert.equal(service.chatMode,false);
+  p.message({type:'bridge-chat-ui',v:1,nonce:rebound,mode:'chat',nativeListHeader:true});
+  assert.equal(service.chatListHeader,true); assert.equal(service.chatMode,true);
   service.requestBack(); await Promise.resolve();
   assert.equal(p.calls.messages.at(-1).message.action,'back'); assert.equal(backward,0);
   p.message({type:'bridge-chat-ui',v:1,nonce:rebound,mode:'list'}); assert.equal(service.chatMode,false);
