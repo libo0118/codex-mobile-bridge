@@ -158,6 +158,8 @@ test('page-state payload is boolean-only; new native prompt keeps the token and 
 });
 
 const index = read('pages/Index.ets');
+const dockExpression = index.slice(index.indexOf("}.width('100%').justifyContent(FlexAlign.Center).padding({ top: this.activeTab === 'chat' ? 2 : 12"))
+  .match(/\.visibility\(([\s\S]*?)\)\r?\n/)[1];
 const promptMethod = index.match(/  private prompt\(event: OnPromptEvent\): boolean \{[\s\S]*?\n  \}/)[0];
 vm.runInContext(strip('class NativePrompt {\n'+promptMethod+'\n}\nthis.NativePrompt = NativePrompt;'),api);
 test('native state acknowledgement rejects a mismatched prompt source and malformed payload before changing the dock', () => {
@@ -185,17 +187,20 @@ test('native menu captures the open target and rejects changed generations, orig
   }
   assert.match(index,/查看归档会话[^\n]+\.selected\(this\.codeyUi\.archived\)\.selectIcon\(true\)/);
   assert.match(index,/bindMenu\(this\.gatewayMenu, \{ onAppear:.*captureGatewayMenu/);
-  const visibility = index.match(/\.visibility\((this\.activeTab === 'codex' && this\.connected && this\.codeyUi\.chat \? Visibility\.None : Visibility\.Visible)\)/)[1];
-  const visible = new Function('Visibility','return '+visibility);
+  const visible = new Function('Visibility','return '+dockExpression);
   Object.assign(native,{activeTab:'codex',connected:true,codeyUi:{chat:true}}); assert.equal(visible.call(native,{None:'none',Visible:'visible'}),'none');
   native.codeyUi.chat = false; assert.equal(visible.call(native,{None:'none',Visible:'visible'}),'visible');
   native.codeyUi.chat = true; native.activeTab='keeper'; assert.equal(visible.call(native,{None:'none',Visible:'visible'}),'visible');
+  native.activeTab='chat'; native.chatInConversation=true; native.configId='';
+  assert.equal(visible.call(native,{None:'none',Visible:'visible'}),'none');
+  native.chatInConversation=false; assert.equal(visible.call(native,{None:'none',Visible:'visible'}),'visible');
+  native.chatInConversation=true; native.configId='chat'; assert.equal(visible.call(native,{None:'none',Visible:'visible'}),'visible');
 });
 
 const componentLogic = index.slice(0,index.indexOf('  @Builder')).replace(/@\w+(?:\([^()\n]*\))?\s*/g,'').replace('struct Index','class Index') + '\n}';
 Object.assign(api,{getContext:()=>({}),DEFAULT_DOWNLOAD_LIMIT_MIB:200,ComputerStore:class {},ServiceStore:class {},ForegroundEvents:class {},webview:{WebviewController:class {}}});
 vm.runInContext(strip(componentLogic)+'\nthis.NativePage = Index;',api);
-const dockVisibility = new Function('Visibility','return '+index.match(/\.visibility\((this\.activeTab === 'codex' && this\.connected && this\.codeyUi\.chat \? Visibility\.None : Visibility\.Visible)\)/)[1]);
+const dockVisibility = new Function('Visibility','return '+dockExpression);
 const dock = native => dockVisibility.call(native,{None:'hidden',Visible:'visible'});
 
 function nativePage(h) {

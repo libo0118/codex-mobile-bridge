@@ -1,4 +1,5 @@
 import common from '@ohos.app.ability.common';
+import util from '@ohos.util';
 import webview from '@ohos.web.webview';
 import { ServiceSite, serviceCredentialURL } from './ServiceSite';
 import { httpsOrigin, externalHTTP, credentialScopeMatches } from '../security/GatewayURL';
@@ -7,25 +8,53 @@ import { webString } from '../web/DownloadScript';
 import { credentialFillScript } from './CredentialFill';
 import { CredentialKind } from './CredentialVault';
 import { keeperPage, keeperUiScript } from './KeeperUi';
-import { chatUiScript } from './ChatUi';
+import { chatUiScript, chatUiActionScript } from './ChatUi';
 
 @Component
 export struct ServiceWeb {
   @Prop site: ServiceSite = new ServiceSite('', '', '');
-  @Prop active: boolean = false;
+  @Prop @Watch('activeChanged') active: boolean = false;
   @Prop @Watch('requestBack') backRequest: number = 0;
   onConfigure: () => void = () => {};
   onAppBack: () => void = () => {};
+  onChatMode: (chat: boolean) => void = () => {};
   @State status: string = '';
   @State currentURL: string = '';
   @State loginRequest: number = 0;
+  @State chatMode: boolean = false;
+  @State chatReady: boolean = false;
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
   private controller: webview.WebviewController = new webview.WebviewController();
   private initialURL: string = '';
   private chatInitial: boolean = true;
   private backGeneration: number = 0;
+  private chatGeneration: number = 0;
+  private chatToken: string = '';
 
   aboutToAppear(): void { this.initialURL = this.site.url; }
+  aboutToDisappear(): void { this.clearChat(); }
+
+  private clearChat(): void {
+    this.chatGeneration++;
+    this.chatToken = '';
+    this.chatMode = false;
+    this.chatReady = false;
+    if (this.site.id === 'chat') this.onChatMode(false);
+  }
+
+  private newChatToken(): void {
+    this.clearChat();
+    if (this.site.id === 'chat' && this.active) this.chatToken = util.generateRandomUUID().replace(new RegExp('-', 'g'), '').toLowerCase();
+  }
+
+  private activeChanged(): void {
+    if (this.site.id !== 'chat') return;
+    const oldToken = this.chatToken, current = this.currentURL;
+    this.newChatToken();
+    if (!this.active && oldToken) {
+      try { this.controller.runJavaScript(chatUiActionScript(current, oldToken, 'suspend')).catch(() => {}); } catch (_) {}
+    } else if (this.active) this.chatCommand();
+  }
 
   private allowed(target: string): boolean {
     try { const origin = httpsOrigin(target); return origin === httpsOrigin(this.site.url) || origin === this.site.loginOrigin; }
@@ -62,20 +91,67 @@ export struct ServiceWeb {
   }
 
   private chatCommand(): void {
-    if (this.site.id !== 'chat') return;
+    if (this.site.id !== 'chat' || !this.active || !this.chatToken) return;
+    const ticket = this.chatGeneration, token = this.chatToken;
     try {
       const current = this.controller.getUrl();
-      if (!this.allowed(current)) return;
-      this.controller.runJavaScript(chatUiScript(current, this.initialURL, this.chatInitial)).then((result: string): void => {
+      if (!this.allowed(current) || current !== this.currentURL) return;
+      this.controller.runJavaScript(chatUiScript(current, this.initialURL, this.chatInitial, token)).then((result: string): void => {
+        if (!this.active || ticket !== this.chatGeneration || token !== this.chatToken || this.currentURL !== current) return;
         if (webString(result) === 'ready') this.chatInitial = false;
+        else if (webString(result) === 'unavailable') this.status = 'Chat 页面适配失败，请手动刷新。';
       }).catch((): void => {
-        if (this.active && this.currentURL === current) this.status = 'Chat 页面适配失败，请手动刷新。';
+        if (this.active && ticket === this.chatGeneration && token === this.chatToken && this.currentURL === current) this.status = 'Chat 页面适配失败，请手动刷新。';
       });
-    } catch (_) { if (this.active) this.status = 'Chat 页面适配失败，请手动刷新。'; }
+    } catch (_) { if (this.active && ticket === this.chatGeneration) this.status = 'Chat 页面适配失败，请手动刷新。'; }
+  }
+
+  private chatAction(action: string): void {
+    if (!this.active || this.site.id !== 'chat' || !this.chatToken) return;
+    const current = this.currentURL, token = this.chatToken, ticket = this.chatGeneration;
+    if (current !== this.initialURL) { this.chatActionFailed(current, token, 'Chat 页面已变化，请手动刷新。'); return; }
+    try {
+      this.controller.runJavaScript(chatUiActionScript(current, token, action)).then((result: string): void => {
+        if (this.active && ticket === this.chatGeneration && current === this.currentURL && webString(result) !== 'sent') {
+          this.chatActionFailed(current, token, 'Chat 页面尚未就绪，请手动刷新。');
+        }
+      }).catch((): void => {
+        if (this.active && ticket === this.chatGeneration && current === this.currentURL) this.chatActionFailed(current, token, 'Chat 页面操作失败，请手动刷新。');
+      });
+    } catch (_) {
+      if (this.active && ticket === this.chatGeneration && current === this.currentURL) this.chatActionFailed(current, token, 'Chat 页面操作失败，请手动刷新。');
+    }
+  }
+
+  private chatActionFailed(current: string, token: string, message: string): void {
+    this.clearChat();
+    this.status = message;
+    try { this.controller.runJavaScript(chatUiActionScript(current, token, 'suspend')).catch(() => {}); } catch (_) {}
+  }
+
+  private chatPrompt(event: OnPromptEvent): boolean {
+    if (!event.message.startsWith('bridge-chat-ui:')) return false;
+    let current = '';
+    try { current = this.controller.getUrl(); } catch (_) {}
+    const suffix = '?view=plugin-chat';
+    const base = this.initialURL.endsWith(suffix) ? this.initialURL.substring(0, this.initialURL.length - suffix.length) : '';
+    const fallback = base !== '' && current.startsWith(base) && new RegExp('^\\?view=[a-z0-9-]+$').test(current.substring(base.length));
+    if (base !== '' && this.active && this.site.id === 'chat' && this.site.enabled !== false && this.site.url === this.initialURL &&
+      this.chatToken && event.message === 'bridge-chat-ui:' + this.chatToken &&
+      event.url === current && this.currentURL === current &&
+      (current === this.initialURL && (event.value === 'list' || event.value === 'chat') || fallback && event.value === 'list')) {
+      this.chatReady = current === this.initialURL;
+      this.chatMode = event.value === 'chat';
+      this.onChatMode(this.chatMode);
+      event.result.handlePromptConfirm('saved');
+    } else event.result.handleCancel();
+    return true;
   }
 
   private requestBack(): void {
-    if (!this.active || this.site.id !== 'keeper') return;
+    if (!this.active) return;
+    if (this.site.id === 'chat') { if (this.chatMode) this.chatAction('back'); return; }
+    if (this.site.id !== 'keeper') return;
     const ticket = ++this.backGeneration;
     let current: string = this.currentURL;
     try { current = this.controller.getUrl(); } catch (_) {}
@@ -101,6 +177,10 @@ export struct ServiceWeb {
         MenuItem({ content: '网页返回' }).onClick(() => { this.back(); })
         MenuItem({ content: '登录信息' }).onClick(() => { if (this.active) this.loginRequest++; })
         MenuItem({ content: '切换原网页工具栏' }).onClick(() => { this.keeperCommand('layout'); })
+      }
+      if (this.site.id === 'chat' && this.chatReady) {
+        MenuItem({ content: '对话设置' }).onClick(() => { this.chatAction('settings'); })
+        MenuItem({ content: '登录信息' }).onClick(() => { if (this.active) this.loginRequest++; })
       }
       MenuItem({ content: '刷新页面' }).onClick(() => { if (this.active) this.controller.refresh(); })
       MenuItem({ content: '站点设置' }).onClick(() => { if (this.active) this.onConfigure(); })
@@ -131,16 +211,24 @@ export struct ServiceWeb {
   private servicePage() {
     Column() {
       Row({ space: 8 }) {
+        if (this.site.id === 'chat' && this.chatMode) {
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Image($r('app.media.keeper_header_back')).width(24).height(24).objectFit(ImageFit.Contain)
+          }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
+            .accessibilityText('返回会话列表').onClick(() => { this.chatAction('back'); })
+        }
         Text(this.site.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
           .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-        Button({ type: ButtonType.Normal, stateEffect: true }) {
-          Image($r('app.media.keeper_header_back')).width(24).height(24).objectFit(ImageFit.Contain)
-        }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
-          .accessibilityText(this.site.name + ' 网页返回').onClick(() => { this.back(); })
-        Button({ type: ButtonType.Normal, stateEffect: true }) {
-          Image($r('app.media.keeper_header_key')).width(24).height(24).objectFit(ImageFit.Contain)
-        }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
-          .accessibilityText(this.site.name + ' 登录信息').onClick(() => { if (this.active) this.loginRequest++; })
+        if (this.site.id !== 'chat' || !this.chatReady) {
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Image($r('app.media.keeper_header_back')).width(24).height(24).objectFit(ImageFit.Contain)
+          }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
+            .accessibilityText(this.site.name + ' 网页返回').onClick(() => { this.back(); })
+          Button({ type: ButtonType.Normal, stateEffect: true }) {
+            Image($r('app.media.keeper_header_key')).width(24).height(24).objectFit(ImageFit.Contain)
+          }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
+            .accessibilityText(this.site.name + ' 登录信息').onClick(() => { if (this.active) this.loginRequest++; })
+        }
         Button({ type: ButtonType.Normal, stateEffect: true }) {
           Image($r('app.media.keeper_header_more')).width(24).height(24).objectFit(ImageFit.Contain)
         }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
@@ -150,12 +238,32 @@ export struct ServiceWeb {
       Web({ src: this.initialURL, controller: this.controller })
         .javaScriptAccess(true).domStorageAccess(true).fileAccess(false).mixedMode(MixedMode.None).multiWindowAccess(false).geolocationAccess(false)
         .onLoadIntercept((event) => event ? this.navigate(event.data) : true)
-        .onPageBegin((event) => { if (event) { this.currentURL = event.url; this.status = ''; } })
+        .onPrompt((event) => event ? this.chatPrompt(event) : true)
+        .onPageBegin((event) => { if (event) { if (this.site.id === 'chat') this.newChatToken(); this.currentURL = event.url; this.status = ''; } })
         .onPageEnd((event) => {
-          if (event && this.allowed(event.url)) { this.currentURL = event.url; webview.WebCookieManager.saveCookieAsync().catch(() => {}); this.keeperCommand(); this.chatCommand(); }
+          if (event && this.allowed(event.url)) {
+            let current = event.url;
+            if (this.site.id === 'chat') { try { current = this.controller.getUrl(); } catch (_) { current = ''; } }
+            if (event.url === current) { this.currentURL = event.url; webview.WebCookieManager.saveCookieAsync().catch(() => {}); this.keeperCommand(); this.chatCommand(); }
+          }
         })
-        .onRefreshAccessedHistory((event) => { if (event) { this.currentURL = event.url; this.keeperCommand(); this.chatCommand(); } })
-        .onErrorReceive((event) => { if (event && event.request.isMainFrame()) this.status = '连接失败，请检查网络后手动刷新。'; })
+        .onRefreshAccessedHistory((event) => {
+          if (event) {
+            if (this.site.id === 'chat') {
+              let current = '';
+              try { current = this.controller.getUrl(); } catch (_) {}
+              if (current !== event.url) return;
+            }
+            if (this.site.id === 'chat' && event.url !== this.currentURL) this.newChatToken();
+            this.currentURL = event.url; this.keeperCommand(); this.chatCommand();
+          }
+        })
+        .onErrorReceive((event) => {
+          if (event && event.request.isMainFrame()) {
+            if (this.site.id === 'chat' && event.request.getRequestUrl() === this.currentURL) this.clearChat();
+            this.status = '连接失败，请检查网络后手动刷新。';
+          }
+        })
         .width('100%').layoutWeight(1)
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
   }

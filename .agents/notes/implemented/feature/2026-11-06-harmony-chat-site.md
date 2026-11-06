@@ -12,6 +12,9 @@ Status: implemented
 - Chat 地址仅接受普通 HTTPS 站点地址或唯一的 `?view=plugin-chat` 查询；凭据仍由用户明确操作并绑定独立的 `chat` ID 和去掉固定查询后的 HTTPS 站点路径。密码、私密入口链接与任意参数不写入普通站点配置，也不复用 `magpie` 的凭据记录。
 - 仅当 Chat 实例的配置明确要求 `view=plugin-chat` 时，主框架识别 `#view-plugin-chat > iframe.plugin-frame` 并调整外层留白和最小高度，不修改 iframe 的 `sandbox`、URL、权限或内部页面。用户点击其他页面后不持续强制切回。
 - 对确认部署页面的首次插件注册竞态，初始化期间仅在同一路径的当前视图及其插件导航按钮均可识别时点击一次；脚本安装前若标准 `navigator.userActivation.hasBeenActive` 已记录用户动作，或安装后发生真实用户操作、离开目标页面或 15 秒超时，均取消等待。该点击只选择原页面，不发送消息或调用聊天接口。
+- 只有配置的 Chat URL、选中的插件导航、未隐藏的 Chat 视图、`#view-plugin-chat > iframe.plugin-frame` 与 `allow-scripts` sandbox 均已识别时，窄屏才隐藏 Magpie 外层 `body.web > header.top` 和 `#nav`；其他视图及登录页不隐藏。外层 flex 布局将回收的空间交给原 iframe，不进入其 DOM。
+- 父页面使用独立随机 nonce 与该 opaque iframe 交换 `bridge-chat-ui` v1 UI 状态，只接受来源为该 frame、origin 为 `null`、nonce 和字段完全匹配的 `list` / `chat`；操作只允许 `back` / `settings`。本机单独生成的文档 token 不传给 iframe，原生 prompt 再校验当前站点、启用状态、代次对应 token、事件和控制器的完整 URL。已识别同路径回退视图只可确认 `list`，用于首屏切换前核对仍为当前页面。
+- 接管先发送 `bind(nativeNavigation:false)`，插件报告状态且当前 Native 确认后才发送 `bind(nativeNavigation:true)`；失败或操作无回报时显示底栏并请求恢复子页返回。超时后的旧 `chat` 回报不能立刻再次接管，直到重新加载或子页返回列表。导航、停用、卸载及错误清除本机状态；不靠轮询维护状态。
 
 ## Existing-note audit
 
@@ -31,9 +34,11 @@ Status: implemented
 
 在独立浏览器标签对真实部署页面执行同一外层脚本，首次回退到供应商页后可识别并进入对话；390×760 与 320×500 的外框尺寸及 sandbox 与上述 Mock 一致。没有发送消息或更改子框架；浏览器设备尺寸模拟不等同于鸿蒙 ArkWeb 或系统软键盘验证。
 
+此次回归执行生成的主框架脚本和实际 Native 方法，覆盖来源、nonce、token、过期、停用、回退页、交接失败及 UI 操作回报；实际插件配合与 ArkWeb 行为仍需另行验证。
+
 ## Consequences
 
-真实部署的 Chat 子页面在小于等于 560px 时隐藏历史列表，当前展开按钮也不可见；输入区的发送、附件及模型控件约 24px。由于子页面通过沙箱 URL 导航，外层适配没有修复这些内部问题。OpenHarmony 的 [ScriptItem 与文档开始注入声明](https://github.com/openharmony/interface_sdk-js/blob/master/api/%40internal/component/ets/web.d.ts)没有明确保证不透明来源子框架的匹配行为，不据此声称已解决。需要 Chat 插件源码和受控部署范围，直接在插件内修复移动布局，并另行验证历史、发送、流式、附件和手机软键盘。
+原部署的 Chat 子页面在小于等于 560px 时隐藏历史列表且部分控件偏小；父页面不能越过 sandbox 修复子页。新 UI 协议需要对应插件版本；旧插件或握手失败时不假装已经接管。历史、发送、流式、附件和手机软键盘仍需在实际插件及鸿蒙设备上验证。
 
 [HTML 标准](https://html.spec.whatwg.org/multipage/interaction.html#dom-useractivation-hasbeenactive)定义的 sticky activation 能记录脚本安装前的用户交互；当前未在目标 ArkWeb 实机验证该属性的实现和时序。如果运行时不提供此属性，安装前极快切页仍无法与站点自动回退区分；安装后交互继续由事件取消等待。
 

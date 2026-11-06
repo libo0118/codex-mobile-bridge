@@ -58,6 +58,7 @@ struct Index {
   @State alerts: boolean = false;
   @State activeTab: string = 'codex';
   @State keeperBackRequest: number = 0;
+  @State chatInConversation: boolean = false;
   @State services: ServiceSite[] = [];
   @State loadedServices: ServiceSite[] = [];
   @State configId: string = '';
@@ -172,6 +173,7 @@ struct Index {
 
   private selectTab(id: string): void {
     this.interaction = 0;
+    this.chatInConversation = false;
     this.closeServiceConfig();
     this.activeTab = id;
     if (id === 'codex') { this.updateBars(this.codexTop); this.startEvents(); this.syncCodeyUi(); return; }
@@ -186,6 +188,7 @@ struct Index {
   private configureService(site: ServiceSite): void {
     this.configGeneration++;
     this.interaction = 0;
+    this.chatInConversation = false;
     if (this.connected && this.activeTab === 'codex') this.events.stop();
     this.configId = site.id; this.serviceName = site.name; this.serviceAddress = site.url; this.serviceEnabled = site.enabled !== false;
   }
@@ -708,14 +711,15 @@ struct Index {
   @Builder
   private navigationItem(id: string, label: string) {
     Button({ type: ButtonType.Normal }) {
-      Column({ space: 4 }) {
+      Column({ space: this.activeTab === 'chat' ? 2 : 4 }) {
         Image(this.navigationIcon(id)).width(24).height(24).objectFit(ImageFit.Contain)
           .draggable(false).accessibilityLevel('no')
         Text(label).width('100%').fontSize(12).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
           .textAlign(TextAlign.Center).fontWeight(this.activeTab === id ? FontWeight.Medium : FontWeight.Normal)
           .fontColor(this.activeTab === id ? '#0A59F7' : '#303640')
       }.width('100%').justifyContent(FlexAlign.Center)
-    }.layoutWeight(1).constraintSize({ minWidth: 44, minHeight: 60 }).padding({ left: 3, right: 3, top: 8, bottom: 8 })
+    }.layoutWeight(1).constraintSize({ minWidth: 44, minHeight: this.activeTab === 'chat' ? 52 : 60 })
+      .padding({ left: 3, right: 3, top: this.activeTab === 'chat' ? 4 : 8, bottom: this.activeTab === 'chat' ? 4 : 8 })
       .backgroundColor(Color.Transparent).borderRadius(30)
       .accessibilityGroup(true).accessibilityText(label + (this.activeTab === id ? this.L('，已选中', ', selected') : ''))
       .onClick(() => { this.selectTab(id); })
@@ -870,6 +874,7 @@ struct Index {
       return true;
     }
     if (this.activeTab === 'keeper') { this.keeperBackRequest++; return true; }
+    if (this.activeTab === 'chat' && this.chatInConversation) { this.keeperBackRequest++; return true; }
     if (this.activeTab !== 'codex') { this.selectTab('codex'); return true; }
     if (!this.connected) return false;
     const ticket = this.generation;
@@ -1030,6 +1035,10 @@ struct Index {
           ServiceWeb({ site: site, active: this.activeTab === site.id && !this.configId,
             backRequest: this.keeperBackRequest,
             onAppBack: () => { if (this.activeTab === 'keeper' && !this.configId) this.selectTab('codex'); },
+            onChatMode: (chat: boolean) => {
+              if (site.id === 'chat' && this.activeTab === 'chat' && !this.configId &&
+                this.services.some((item: ServiceSite) => item.id === 'chat' && item.enabled !== false && item.url === site.url)) this.chatInConversation = chat;
+            },
             onConfigure: () => { this.configureService(site); } })
             .visibility(this.activeTab === site.id && !this.configId ? Visibility.Visible : Visibility.Hidden)
         }, (site: ServiceSite) => site.id + '|' + site.url)
@@ -1064,12 +1073,13 @@ struct Index {
             ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false), (site: ServiceSite) => {
               this.navigationItem(site.id, site.name)
             }, (site: ServiceSite) => site.id)
-          }.padding({ left: 5, right: 5, top: 4, bottom: 4 }).width('100%')
+          }.padding({ left: 5, right: 5, top: this.activeTab === 'chat' ? 2 : 4, bottom: this.activeTab === 'chat' ? 2 : 4 }).width('100%')
             .borderRadius(999).clip(true).attributeModifier(this.navigationMaterial())
         }.width('96%').constraintSize({ maxWidth: 440 }).padding(1).attributeModifier(new NavigationChrome())
           .priorityGesture(LongPressGesture({ repeat: false, duration: 600 }).onAction(() => { this.openNavigationSettings(); }))
-      }.width('100%').justifyContent(FlexAlign.Center).padding({ top: 12, bottom: 2 }).backgroundColor('#FFFFFF')
-        .visibility(this.activeTab === 'codex' && this.connected && this.codeyUi.chat ? Visibility.None : Visibility.Visible)
+      }.width('100%').justifyContent(FlexAlign.Center).padding({ top: this.activeTab === 'chat' ? 2 : 12, bottom: 2 }).backgroundColor('#FFFFFF')
+        .visibility((this.activeTab === 'codex' && this.connected && this.codeyUi.chat) ||
+          (this.activeTab === 'chat' && !this.configId && this.chatInConversation) ? Visibility.None : Visibility.Visible)
     }.width('100%').height('100%').backgroundColor('#f5f5f3')
       .bindSheet($$this.navigationSettings, this.navigationSettingsPanel(), { height: '70%', showClose: !this.savingNavigation,
         backgroundColor: '#f5f5f3' })
