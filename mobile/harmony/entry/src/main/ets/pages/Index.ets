@@ -14,6 +14,7 @@ import { loadMobileScripts, mobileScript, uploadGestureScript, BACK_SCRIPT } fro
 import { CodeyUiState, decodeCodeyUiState, codeyUiScript, codeyUiActionScript } from '../web/CodeyUi';
 import { webString } from '../web/DownloadScript';
 import { AttachmentDownload, DownloadFile, selectUpload, saveAttachment, discardAttachment, clearStaleAttachments } from '../web/Files';
+import { CameraPhoto, acceptsCameraPhoto, capturePhoto, discardCapture, clearStaleCaptures } from '../web/CameraCapture';
 import { ForegroundEvents } from '../notifications/ForegroundEvents';
 import { ServiceSite, ServiceStore } from '../services/ServiceSite';
 import { ServiceWeb } from '../services/ServiceWeb';
@@ -91,6 +92,8 @@ struct Index {
   private async initialize(): Promise<void> {
     try {
       clearStaleAttachments(this.context);
+      try { clearStaleCaptures(this.context); }
+      catch (_) { this.message(this.L('无法清理上次的拍照缓存，请检查应用存储。', 'Cannot clean up previous camera files. Check app storage.')); }
       this.computers = await this.store.load(this.context);
       this.language = await this.store.savedLanguage();
       this.alerts = await this.store.savedAlerts();
@@ -582,18 +585,45 @@ struct Index {
   private async upload(event: OnShowFileSelectorEvent): Promise<void> {
     const ticket = this.generation;
     const base = this.base;
-    if (this.activeTab !== 'codex' || !this.foreground || !sameGateway(this.currentURL(), base) || isPreviewShell(this.currentURL(), base) ||
-      event.fileSelector.getMode() === FileSelectorMode.FileOpenFolderMode || event.fileSelector.getMode() === FileSelectorMode.FileSaveMode) {
-      event.result.handleFileList([]); return;
-    }
+    const target = this.currentURL();
+    let selected: string[] = [];
+    let photo: CameraPhoto | undefined;
+    let cameraRequested = false;
     try {
-      const gesture = await this.controller.runJavaScript(uploadGestureScript(this.token));
-      if (webString(gesture) !== 'true' || ticket !== this.generation || base !== this.base || !this.foreground) {
-        event.result.handleFileList([]); return;
+      if (this.activeTab === 'codex' && this.foreground && sameGateway(target, base) && !isPreviewShell(target, base) &&
+        event.fileSelector.getMode() !== FileSelectorMode.FileOpenFolderMode && event.fileSelector.getMode() !== FileSelectorMode.FileSaveMode) {
+        const gesture = await this.controller.runJavaScript(uploadGestureScript(this.token));
+        if (webString(gesture) === 'true' && ticket === this.generation && base === this.base && this.foreground &&
+          this.activeTab === 'codex' && this.currentURL() === target) {
+          const types = event.fileSelector.getAcceptType();
+          cameraRequested = event.fileSelector.isCapture() && acceptsCameraPhoto(types);
+          if (cameraRequested) {
+            photo = await capturePhoto(this.context, (): boolean => ticket === this.generation && base === this.base &&
+              this.foreground && this.activeTab === 'codex' && this.currentURL() === target);
+            if (photo) selected = [photo.uri];
+          } else {
+            selected = await selectUpload(this.context, event.fileSelector.getMode() === FileSelectorMode.FileOpenMultipleMode);
+          }
+          if (ticket !== this.generation || base !== this.base || this.activeTab !== 'codex' || this.currentURL() !== target ||
+            !sameGateway(this.currentURL(), base)) selected = [];
+        }
       }
-      const selected = await selectUpload(this.context, event.fileSelector.getMode() === FileSelectorMode.FileOpenMultipleMode);
-      event.result.handleFileList(ticket === this.generation && base === this.base && sameGateway(this.currentURL(), base) ? selected : []);
-    } catch (_) { event.result.handleFileList([]); }
+    } catch (_) {
+      selected = [];
+      if (cameraRequested && ticket === this.generation && base === this.base && this.activeTab === 'codex' && this.currentURL() === target) {
+        this.status = this.L('无法拍照或读取照片，请重试。', 'Cannot capture or read the photo. Please try again.');
+      }
+    }
+    if (photo && !selected.length) {
+      try { discardCapture(photo); }
+      catch (_) {
+        console.error('Cannot remove the unused camera file.');
+        if (ticket === this.generation && base === this.base && this.activeTab === 'codex' && this.currentURL() === target) {
+          this.status = this.L('无法清理未使用的拍照缓存。', 'Cannot remove the unused camera file.');
+        }
+      }
+    }
+    event.result.handleFileList(selected);
   }
 
   private async beginDownload(target: string): Promise<void> {
