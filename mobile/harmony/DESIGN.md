@@ -2,7 +2,7 @@
 
 本次是原生外壳移植及已有管理页面的页签容器。聊天、工作区、账号等页面仍来自同一网关 `web/`，鸿蒙端叠加显示适配；三个共用注入脚本保持原顺序。
 
-原生电脑列表沿用 Android `MainActivity` 的视觉值：页面 `#f5f5f3`、白色卡片、主要文字 `#202124`、次要文字 `#777b80`、浅色操作面 `#f4f5f7`、移除操作 `#b44235`；页面边距 20 vp，卡片圆角 22 vp，按钮圆角 12–16 vp，主要操作高度 54 vp，次要触控不低于 44 vp。标题 30 fp、分区标题 19 fp、电脑名 17 fp、正文 14–16 fp、辅助文字 12–13 fp。文本允许系统缩放，连接入口、菜单和图标等价操作保留可读名称。
+原生电脑列表与已确认的 Cindy/Codey 移动样式协调：页面 `#f8f8f5`、卡片 `#fffffc`、1 vp `#dfe2dc` 描边，主要文字 `#202124`、次要文字 `#777b80`、浅色操作面 `#f4f5f7`、移除操作 `#b44235`；页面边距 20 vp，卡片圆角 18 vp，扫码主操作为 54 vp 胶囊，内层按钮圆角 12 vp，次要触控不低于 44 vp。标题 30 fp、分区标题 19 fp、电脑名 17 fp、正文 14–16 fp、辅助文字 12–13 fp，主页面标题使用 Medium。文本允许系统缩放，连接入口、菜单和图标等价操作保留可读名称。只调整外观，不改连接、凭据或下载格式。
 
 主任务依次是：核对并连接自己的电脑、继续现有聊天、查看文件结果、返回电脑列表。CPA / Magpie 的工具栏复用相同颜色、按钮和文字规则；Keeper 另做鸿蒙客户端显示适配。首次打开后使用独立且常驻的 Web 实例，切换仅改变可见性。站点设置改变 URL 和用户主动刷新才重新加载；应用重启后的重新加载是系统生命周期边界。
 
@@ -10,9 +10,9 @@
 
 Codey 远程页面由独立 `CodeyUi` postlude 识别 React 根、标题、电脑状态和侧栏三个原控件。标题与状态用 CSS grid 同排，不移动原节点；为搜索、新建和现有原生更多菜单分别保留位置。归档是查看归档列表的筛选，不是归档当前聊天；菜单选中状态来自原 checkbox/aria-pressed，控制台和设备退出也只点击原按钮。“已配对”保留认证含义，不改为执行进程在线。原生确认接管后才隐藏已完整识别的工具；未知控件保留原 UI。
 
-Codey 聊天沿用网页已有单排附件、权限、模型、发送/停止及弹层，不另造输入栏。详情仅将原生四入口区域设为 `Visibility.None`，Web 和站点组件保持原挂载位置；更多菜单可返回列表或切站点，回列表恢复底栏。主框架通过 `codey-ui:<导航 token>` 仅报告布尔状态；动作使用静态 allowlist，重新核验菜单打开时完整 URL、导航代次、来源和当前原控件，不运行页面提供的脚本。新增裸局域网主机默认 `http:18787`，完整 URL、显式端口、存量连接和公网 HTTPS 默认语义不变。[决定与验证](../../.agents/notes/implemented/bug-fix/2026-11-04-harmony-codey-compact-controls.md)。
+Codey 聊天沿用网页输入组件：附件、正文、发送/停止同排，权限与模型在其上方，模型与权限沿用原设置动作；不另造原生输入栏。网页头尾的原识别合同不变，搜索与新建各保留 44 px 栏位。详情仅将原生三入口区域设为 `Visibility.None`，Web 和站点组件保持原挂载位置；更多菜单可返回列表或切站点，回列表恢复底栏。主框架通过 `codey-ui:<导航 token>` 仅报告布尔状态；动作使用静态 allowlist，重新核验菜单打开时完整 URL、导航代次、来源和当前原控件，不运行页面提供的脚本。新增裸局域网主机默认 `http:18787`，完整 URL、显式端口、存量连接和公网 HTTPS 默认语义不变。[决定与验证](../../.agents/notes/implemented/bug-fix/2026-11-04-harmony-codey-compact-controls.md)。
 
-Keeper、CPA、Magpie 共用 56 vp 原生标题栏：左侧为单行 17 fp 站名，右侧为网页返回、登录信息、更多三枚 24 vp SVG 图标；每枚按钮有 44 × 44 vp 点击区、包含站名的中文可访问名称和原生按压及焦点反馈。返回沿用浏览历史，登录信息显式打开该站点唯一的安全凭据面板，失活时禁用；刷新和站点设置进入更多菜单。站名单行省略，为 320–360 vp 窄屏留出操作空间。历史返回不调用刷新或替换 URL。此布局仍需鸿蒙设备的实际渲染验证。
+Keeper、CPA、Magpie 共用 56 vp 原生标题栏：左侧为单行 17 fp 站名，Keeper、CPA 右侧为网页返回、登录信息、更多三枚 24 vp SVG 图标，Magpie 常驻刷新、设置与更多，网页返回和登录信息在更多中；每枚按钮有 44 × 44 vp 点击区、包含站名的中文可访问名称和原生按压及焦点反馈。返回沿用浏览历史，登录信息显式打开该站点唯一的安全凭据面板，失活时禁用。Magpie 同时识别旧顶栏 `#prefs` 和新版 `body.web.side-nav #prefs`，只隐藏被原生接管的 `#sync/#prefs`，保留原顶栏、`#nav/#sideToggle/#navBack`、更新提示和有功能的 `#sideGw`。未知控件不猜测、不隐藏；不搬移或克隆网页节点、不新增服务 API。站名单行省略，为 320–360 vp 窄屏留出操作空间。历史返回不调用刷新或替换 URL。此布局仍需鸿蒙设备的实际渲染验证。
 
 build40 使用用户明确选定的 C「同心圆环」原稿：三枚图标的圆心均为 (12,12)，外圈半径 9.25、线宽 1.6，颜色 `#303640`；圆框内分别为返回折线、实心钥匙孔和横向三点。按钮常态透明，44 vp 热区使用 22 vp 圆角，保留按压反馈并避免叠加常驻外框。三个管理页直接共用同一组资源；已选 App 图标与底部玻璃导航不变。
 
@@ -22,21 +22,21 @@ Keeper 不再叠加浮动更多按钮。网页顶部保留 48 px 当前分区/�
 
 安全区由默认非沉浸窗口保留。Codex 页面在通过来源与令牌验证后可同步顶部状态栏背景；底部系统手势栏与独立底栏区域同为白色。管理站点无此桥接权限。密码与私密入口的操作在原生登录信息面板中完成，不增加网页中不可见的自动提交动作。
 
-## 悬浮玻璃底栏与 D App图标
+## 全宽原生底栏与 D App图标
 
-2026-10-19 用户指定悬浮玻璃胶囊及统一图标，随后要求收紧下方留白、按官方API支持系统材质和可调模糊，并提供build36实屏反馈胶囊轮廓与底色融为一体。App继续使用D「刻线控制台」，名称 `Codex+`、bundleName保持不变；Harmony build 37。
+App 继续使用 D「刻线控制台」，名称 `Codex+`、bundleName 与已有图标资源保持不变。当前采用全宽三入口布局，不恢复旧版悬浮胶囊，也不在 Codey 网页增加重复导航。
 
-App 主形采用D的银白双门架与琥珀连接梁，背景 `#252A2C`，原始 SVG、透明前景和1024px PNG保存在 `branding/`，主形全部位于中央75%安全圆。四个导航图标重新统一为24vp原创单色填充路径：聊天终端、保险库、分支路由、鸟翼。默认 `#303640`，选中 `#0A59F7`；选中图形同时由轮廓变为实心，保留文字与完整可访问名称。
+App 主形采用D的银白双门架与琥珀连接梁，背景 `#252A2C`，原始 SVG、透明前景和1024px PNG保存在 `branding/`，主形全部位于中央75%安全圆。导航沿用24vp原创单色填充图标资源。默认 `#303640`，选中 `#0A59F7`；选中图形同时由轮廓变为实心，保留文字与完整可访问名称。
 
-胶囊宽度为屏幕90%、最大380vp，60vp最小按钮高度，外侧上12vp、下2vp。下方应用留白比build35减少10vp，系统手势安全区由操作系统保留。图标上、12fp标签下，系统字体可使原生布局增高。
+底栏宽度为屏幕 100%、高度 56 vp，各入口等分可用宽度。保留 Codex、Keeper、Magpie，CPA 仅从 Codex 更多菜单进入。独立 Chat 及其原生配置入口不再显示；历史 Preferences、Cookie、登录信息和对话数据不删除、不迁移。Magpie 内部会话与 plugin-chat 导航照常保留，不安装独立 Chat 的强制选页/隐藏导航适配。`CodeyUiState.chat` 仍用于聊天详情隐藏底栏。[决定与验证](../../.agents/notes/implemented/bug-fix/2026-11-12-harmony-magpie-navigation.md)。图标在上、12 fp 标签在下，点击宽度不低于 44 vp，系统手势安全区由操作系统保留。
 
-外层 `NavigationChrome` 与内层材质分属两个Row，底栏和设置预览共用同一外壳。外壳保留999vp圆角、1vp边缘，顶部/左侧白色高光，右侧/底部中性灰边缘及18vp柔和投影；只使用低透明度白灰纵向渐变，不覆盖内部材质。外壳不裁剪投影，内层按胶囊圆角裁剪。原有总内边距分为外壳1vp及内层横5/纵4vp，保留按钮尺寸和动态字体高度。独立底栏与系统手势背景统一为 `#FFFFFF`，页面本身仍为原浅灰色；不再出现整条暖灰底带。
+底栏和设置预览复用 `NavigationMaterial`。原生 Row 的基底为 `#f8f8f5`，不再使用悬浮胶囊轮廓或独立装饰阴影；系统手势背景继续使用系统窗口约定。用户保存的模糊、系统材质模式与厚度设置不重置。
 
 长按任意页签的底栏，或打开Codex原生菜单中的“底栏外观”，进入共享设置面板。实时预览，点“完成”保存；直接关闭恢复已保存的外观。偏好仅写入 `bridge-computers` 的独立 `navigationAppearance` JSON key，字段是受限的模式、0–100模糊值和0–4厚度档，不更改连接、语言、通知或凭据。保存失败会提示。无网页刷新、URL替换或Web实例重建。
 
-兼容路径使用较通透的 `backgroundBlurStyle(COMPONENT_ULTRA_THIN, { scale: blur/100 })`，`scale`自API12支持，范围0–1。API14的窗口焦点策略在失焦时使用半透明 `#99EDF2F6`。系统沉浸材质路径只在OS API26及以上延迟导入 `SystemGlass26`，再查询 `uiMaterial.isImmersiveMaterialSupported()`；模块或能力不可用则回退。设备支持时使用公开的 `systemMaterial(new uiMaterial.ImmersiveMaterial({style, applyShadow: false}))`，提供超薄至超厚五档；系统材质没有连续半径参数。系统材质会接管目标组件的背景、边框和阴影，因此只应用于内层Row，外壳轮廓独立保留，统一由外壳提供投影。切换回兼容路径先清除系统材质，避免两种效果叠加。此组件不修改应用全局材质配置，不关闭系统性能自适应。
+兼容路径使用 `backgroundBlurStyle(COMPONENT_ULTRA_THIN, { scale: blur/100 })`，`scale` 自 API12 支持，范围 0–1。API14 的窗口焦点策略在失焦时使用半透明 `#99F8F8F5`。系统沉浸材质路径只在 OS API26 及以上延迟导入 `SystemGlass26`，再查询 `uiMaterial.isImmersiveMaterialSupported()`；模块或能力不可用则回退。设备支持时使用公开的 `systemMaterial(new uiMaterial.ImmersiveMaterial({style, applyShadow: false}))`，提供超薄至超厚五档；系统材质没有连续半径参数。切换回兼容路径先清除系统材质，避免两种效果叠加。此组件不修改应用全局材质配置，不关闭系统性能自适应。
 
-玻璃胶囊放在原有独立原生底栏区域中，网页高度自然避开它；系统字体放大时原生布局允许按钮增高。保留 selectTab、常驻Web实例和Visibility切换，不增加刷新或重建。这个区域下方是平坦底色；官方文档未保证材质跨ArkWeb渲染面取样，因此不宣称能折射或模糊网页文字，实际材质与软键盘避让需真机验证。
+底栏放在独立原生区域中，网页高度自然避开它。保留 selectTab、常驻 Web 实例和 Visibility 切换，不增加刷新或重建。官方文档未保证材质跨 ArkWeb 渲染面取样，因此不宣称能折射或模糊网页文字，实际材质、系统字体缩放与软键盘避让需真机验证。
 
 规范依据：[Apple Materials](https://developer.apple.com/design/human-interface-guidelines/materials)、[Tab bars](https://developer.apple.com/design/human-interface-guidelines/tab-bars)、[OpenHarmony背景模糊](https://github.com/openharmony/docs/blob/OpenHarmony-v7.0-Release/zh-cn/application-dev/reference/apis-arkui/arkui-ts/ts-universal-attributes-background.md)、[公开系统材质API26](https://github.com/openharmony/docs/blob/OpenHarmony-v7.0-Release/zh-cn/application-dev/reference/apis-arkui/arkts-apis-uimaterial.md)。系统沉浸材质在较早版本属于系统接口，本应用不在API23/24调用它。实际效果遵循设备算力和系统沉浸光感设置。
 

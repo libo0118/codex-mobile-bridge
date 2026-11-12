@@ -2,6 +2,8 @@
 
 Status: implemented
 
+独立 Chat 与设置入口已由[三入口与 Magpie 内部导航决定](../bug-fix/2026-11-12-harmony-magpie-navigation.md)取代；本文保留历史数据、凭据和插件协议的独立依据，不表示当前 UI 仍提供该入口。
+
 ## Problem
 
 鸿蒙需要独立的 Chat 底部入口，并允许用户启停和调整地址，而不影响已保存的 Keeper、CPA、Magpie 配置。默认地址的 `view=plugin-chat` 是必要的页面选择，不能把任意查询参数或私密入口写入普通站点设置。部署页面在插件异步注册前会把首次深链接切回其他页面；Chat 又由站点的沙箱 iframe 承载，外层页面样式不能穿过它。

@@ -65,7 +65,7 @@ export const CODEY_UI_SCRIPT: string = String.raw`((notify, expectedURL) => {
       for (const rule of [
         '[data-hos-codey-footer] { display:none !important; }',
         'html[data-hos-codey-page] .remote-chat-header, html[data-hos-codey-page] .remote-topbar { padding-right:64px; }',
-        '[data-hos-codey-header] > .remote-thread-list { display:grid; grid-template-columns:max-content minmax(0,1fr) 40px 40px 48px; grid-template-rows:60px auto minmax(0,1fr); column-gap:2px; padding:0 12px; }',
+        '[data-hos-codey-header] > .remote-thread-list { display:grid; grid-template-columns:max-content minmax(0,1fr) 44px 44px 48px; grid-template-rows:60px auto minmax(0,1fr); column-gap:2px; padding:0 12px; }',
         '[data-hos-codey-header] .remote-list-heading { display:contents; }',
         '[data-hos-codey-header] .remote-list-heading h1 { grid-area:1/1; align-self:center; font-size:22px; }',
         '[data-hos-codey-header] .remote-list-heading > button[aria-label="搜索会话"] { grid-area:1/3; align-self:center; }',

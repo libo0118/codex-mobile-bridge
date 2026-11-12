@@ -46,6 +46,6 @@ export class NavigationMaterial implements AttributeModifier<RowAttribute> {
     }
     if (this.adapter) { try { this.adapter.clear(target); } catch (_) {} }
     target.backgroundBlurStyle(BlurStyle.COMPONENT_ULTRA_THIN, { colorMode: ThemeColorMode.LIGHT, scale: this.blur / 100,
-      policy: BlurStyleActivePolicy.FOLLOWS_WINDOW_ACTIVE_STATE, inactiveColor: '#99EDF2F6' });
+      policy: BlurStyleActivePolicy.FOLLOWS_WINDOW_ACTIVE_STATE, inactiveColor: '#99F8F8F5' });
   }
 }

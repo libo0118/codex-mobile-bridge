@@ -94,7 +94,7 @@ struct Index {
   private events: ForegroundEvents = new ForegroundEvents();
   private serviceStore: ServiceStore = new ServiceStore();
   private configGeneration: number = 0;
-  private codexTop: string = '#f5f5f3';
+  private codexTop: string = '#f8f8f5';
   private systemGlass?: SystemGlassAdapter;
   private menuTarget: string = '';
   private menuGeneration: number = -1;
@@ -178,7 +178,7 @@ struct Index {
     this.activeTab = id;
     if (id === 'codex') { this.updateBars(this.codexTop); this.startEvents(); this.syncCodeyUi(); return; }
     this.events.stop();
-    this.updateBars('#f5f5f3');
+    this.updateBars('#f8f8f5');
     const site = this.services.find((item: ServiceSite) => item.id === id && item.enabled !== false);
     if (!site) { this.selectTab('codex'); return; }
     if (!site.url) { this.configureService(site); return; }
@@ -327,7 +327,7 @@ struct Index {
     this.connected = true;
     this.codeyUi = new CodeyUiState();
     this.status = session.token ? '' : this.L('正在连接 · ', 'Connecting · ') + session.base;
-    this.codexTop = '#f5f5f3';
+    this.codexTop = '#f8f8f5';
     this.updateBars(this.codexTop);
     this.startEvents();
     this.syncCodeyUi();
@@ -400,8 +400,8 @@ struct Index {
     this.codeyUi = new CodeyUiState();
     this.status = '';
     this.base = '';
-    this.codexTop = '#f5f5f3';
-    this.updateBars('#f5f5f3');
+    this.codexTop = '#f8f8f5';
+    this.updateBars('#f8f8f5');
   }
 
   private async rename(computer: Computer): Promise<void> {
@@ -894,11 +894,10 @@ struct Index {
           .onClick(() => { this.connect(computer.base + '/'); })
       }, (computer: Computer) => computer.base)
       MenuItem({ content: 'CPA' }).onClick(() => { this.selectTab('cpa'); })
-      MenuItem({ content: this.L('Chat 设置', 'Chat settings') }).onClick(() => { this.configureChat(); })
       if (this.codeyUi.supported) {
         if (this.codeyUi.chat) {
           MenuItem({ content: this.L('返回会话列表', 'Back to sessions') }).enabled(this.codeyUi.canBack).onClick(() => { this.openCodeyControl('back'); })
-          ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false && site.id !== 'cpa'), (site: ServiceSite) => {
+          ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false && site.id !== 'cpa' && site.id !== 'chat'), (site: ServiceSite) => {
             MenuItem({ content: this.L('切换到 ', 'Switch to ') + site.name }).onClick(() => { this.selectTab(site.id); })
           }, (site: ServiceSite) => site.id)
         }
@@ -927,7 +926,6 @@ struct Index {
   private computerMenu() {
     Menu() {
       MenuItem({ content: 'CPA' }).onClick(() => { this.selectTab('cpa'); })
-      MenuItem({ content: this.L('Chat 设置', 'Chat settings') }).onClick(() => { this.configureChat(); })
       MenuItem({ content: this.L('底栏外观', 'Navigation appearance') }).onClick(() => { this.openNavigationSettings(); })
     }
   }
@@ -955,7 +953,7 @@ struct Index {
           Button(this.L('移除', 'Remove')).layoutWeight(1).height(44).borderRadius(12).backgroundColor('#f4f5f7').fontColor('#b44235').onClick(() => { this.remove(computer); })
         }
       }
-    }.alignItems(HorizontalAlign.Start).width('100%').padding({ left: 20, right: 20, top: 16, bottom: 16 }).backgroundColor('#ffffff').borderRadius(22)
+    }.alignItems(HorizontalAlign.Start).width('100%').padding({ left: 20, right: 20, top: 16, bottom: 16 }).backgroundColor('#fffffc').border({ width: 1, color: '#dfe2dc' }).borderRadius(18)
   }
 
   build() {
@@ -964,7 +962,7 @@ struct Index {
         Column() {
       if (!this.connected) {
         Row() {
-          Text('Codex Bridge').fontSize(18).fontWeight(FontWeight.Bold).fontColor('#202124').layoutWeight(1)
+          Text('Codex Bridge').fontSize(18).fontWeight(FontWeight.Medium).fontColor('#202124').layoutWeight(1)
           Button(this.language === 'en' ? '中文' : 'EN').height(44).backgroundColor(Color.Transparent).fontColor('#777b80')
             .onClick(() => { this.language = this.language === 'en' ? 'zh' : 'en'; this.store.language(this.language).catch(() => {}); })
           Button('•••').width(44).height(44).backgroundColor(Color.Transparent).fontColor('#777b80')
@@ -972,12 +970,11 @@ struct Index {
         }.height(56).padding({ left: 20, right: 12 })
         Scroll() {
           Column({ space: 16 }) {
-            Text(this.L('电脑上的工作，\n带在身边。', 'Your computer’s work,\nalways with you.')).fontSize(30).fontWeight(FontWeight.Bold).fontColor('#202124').textAlign(TextAlign.Center).margin({ top: 30 })
+            Text(this.L('电脑上的工作，\n带在身边。', 'Your computer’s work,\nalways with you.')).fontSize(30).fontWeight(FontWeight.Medium).fontColor('#202124').textAlign(TextAlign.Center).margin({ top: 30 })
             Text(this.L('继续聊天、查看结果，让电脑替你运行。', 'Keep chatting and check results while your computer works.')).fontSize(15).fontColor('#777b80').textAlign(TextAlign.Center).margin({ bottom: 10 })
             Column({ space: 8 }) {
-              Button(this.L('扫码连接电脑', 'Scan to connect')).height(54).fontSize(16).width('100%').backgroundColor('#202124').fontColor('#ffffff').borderRadius(16).enabled(this.ready).onClick(() => { this.scan(); })
+              Button(this.L('扫码连接电脑', 'Scan to connect')).height(54).fontSize(16).width('100%').backgroundColor('#202124').fontColor('#ffffff').borderRadius(999).enabled(this.ready).onClick(() => { this.scan(); })
               Button(this.L('输入网关地址', 'Enter gateway address')).height(54).fontSize(16).width('100%').backgroundColor('#f4f5f7').fontColor('#202124').borderRadius(12).enabled(this.ready).onClick(() => { this.manual = !this.manual; })
-              Button(this.L('Chat 设置', 'Chat settings')).height(44).width('100%').backgroundColor('#f4f5f7').fontColor('#202124').borderRadius(12).enabled(this.ready).onClick(() => { this.configureChat(); })
               if (this.manual) {
                 TextInput({ text: this.address, placeholder: this.L('电脑地址:18787 或 https://', 'host:18787 or https://') }).type(InputType.URL).maxLength(8192).fontSize(16).onChange((value: string) => { this.address = value; })
                 Text(this.L('新局域网主机默认 18787；完整网址和已保存连接保持原端口。', 'New LAN hosts use port 18787. Full URLs and saved connections keep their ports.')).fontSize(12).fontColor('#777b80').width('100%')
@@ -986,13 +983,13 @@ struct Index {
                   Button(this.L('继续', 'Continue')).layoutWeight(1).height(44).backgroundColor('#202124').fontColor('#ffffff').borderRadius(12).onClick(() => { this.choose(this.address); })
                 }
               }
-            }.padding(20).width('100%').backgroundColor('#ffffff').borderRadius(22)
-            Text(this.L('我的电脑', 'My computers')).fontSize(19).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%').margin({ top: 8 })
+            }.padding(20).width('100%').backgroundColor('#fffffc').border({ width: 1, color: '#dfe2dc' }).borderRadius(18)
+            Text(this.L('我的电脑', 'My computers')).fontSize(19).fontWeight(FontWeight.Medium).fontColor('#202124').width('100%').margin({ top: 8 })
             if (this.computers.length === 0) {
               Column({ space: 8 }) {
                 Text(this.L('还没有连接的电脑', 'No computers yet')).fontSize(17).fontColor('#202124').width('100%')
                 Text(this.L('在电脑网关中展开“扫码登录”，然后用上方按钮扫描。', 'Expand “Scan to sign in” in your computer gateway, then scan it above.')).fontSize(14).fontColor('#777b80').width('100%')
-              }.padding(20).width('100%').backgroundColor('#ffffff').borderRadius(22).alignItems(HorizontalAlign.Start)
+              }.padding(20).width('100%').backgroundColor('#fffffc').border({ width: 1, color: '#dfe2dc' }).borderRadius(18).alignItems(HorizontalAlign.Start)
             }
             ForEach(this.computers, (computer: Computer) => { this.computerCard(computer); }, (computer: Computer) => computer.base)
             Text(this.L('外出使用 HTTPS 地址；局域网地址需要连接同一网络。', 'Use HTTPS away from home. LAN addresses need the same network.')).fontSize(13).fontColor('#777b80').textAlign(TextAlign.Center)
@@ -1051,39 +1048,31 @@ struct Index {
         }, (site: ServiceSite) => site.id + '|' + site.url)
         if (this.configId) {
           Column({ space: 16 }) {
-            Text(this.configId === 'keeper' ? 'Keeper' : this.configId === 'chat' ? this.L('Chat 设置', 'Chat settings') : '配置管理站点').fontSize(23).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%')
-            Text(this.configId === 'keeper' ? 'Keeper 使用固定地址。登录信息可在右上角更多菜单中保存；你在应用内自行输入。' : this.configId === 'chat' ?
-              this.L('关闭后隐藏 Chat 并卸载网页，不清除 Cookie 或登录信息。可随时从电脑列表或电脑菜单重新启用。', 'Disabling Chat hides and unloads its page without deleting cookies or saved login information. Enable it again from Computers or the computer menu.') :
+            Text(this.configId === 'keeper' ? 'Keeper' : '配置管理站点').fontSize(23).fontWeight(FontWeight.Bold).fontColor('#202124').width('100%')
+            Text(this.configId === 'keeper' ? 'Keeper 使用固定地址。登录信息可在右上角更多菜单中保存；你在应用内自行输入。' :
               '填写真实 HTTPS 地址。保存后首次加载；之后切换页签保留网页。修改地址会重新加载此站点。')
               .fontSize(14).fontColor('#777b80').width('100%')
-            if (this.configId === 'chat') {
-              Row() {
-                Text(this.L('启用 Chat', 'Enable Chat')).fontSize(16).fontColor('#202124').layoutWeight(1)
-                Toggle({ type: ToggleType.Switch, isOn: this.serviceEnabled }).enabled(!this.savingServices.includes(this.configId))
-                  .onChange((value: boolean) => { this.serviceEnabled = value; })
-              }.width('100%').constraintSize({ minHeight: 44 })
-            }
             TextInput({ text: this.serviceName, placeholder: '站点名称' }).maxLength(16).enabled(this.configId !== 'keeper' && !this.savingServices.includes(this.configId)).onChange((value: string) => { this.serviceName = value; })
             TextInput({ text: this.serviceAddress, placeholder: 'https://' }).type(InputType.URL).maxLength(4096).enabled(this.configId !== 'keeper' && !this.savingServices.includes(this.configId)).onChange((value: string) => { this.serviceAddress = value; })
             Text('请勿在地址中包含用户名、密码或访问令牌。登录后 Cookie 由系统网页组件保存。').fontSize(13).fontColor('#777b80').width('100%')
-            Button(this.savingServices.includes(this.configId) ? '保存中…' : (this.configId === 'keeper' ? '返回网页' : this.configId === 'chat' ? this.L('保存设置', 'Save settings') : '保存并打开')).width('100%').height(54).backgroundColor('#202124').fontColor('#ffffff').enabled(!this.savingServices.includes(this.configId)).onClick(() => { this.saveService(); })
+            Button(this.savingServices.includes(this.configId) ? '保存中…' : (this.configId === 'keeper' ? '返回网页' : '保存并打开')).width('100%').height(54).backgroundColor('#202124').fontColor('#ffffff').enabled(!this.savingServices.includes(this.configId)).onClick(() => { this.saveService(); })
             Button('取消').width('100%').height(48).backgroundColor('#f4f5f7').fontColor('#202124').enabled(!this.savingServices.includes(this.configId)).onClick(() => { this.selectTab('codex'); })
-          }.alignItems(HorizontalAlign.Start).padding(24).width('100%').height('100%').backgroundColor('#f5f5f3')
+          }.alignItems(HorizontalAlign.Start).padding(24).width('100%').height('100%').backgroundColor('#f8f8f5')
         }
       }.width('100%').layoutWeight(1)
         .bindSheet($$this.downloadSettings, this.downloadSettingsPanel(), { height: '70%', showClose: !this.savingDownloadSettings,
-          backgroundColor: '#f5f5f3', onWillDismiss: (action: DismissSheetAction) => { this.dismissDownloadSettings(action); } })
+          backgroundColor: '#f8f8f5', onWillDismiss: (action: DismissSheetAction) => { this.dismissDownloadSettings(action); } })
       Row() {
         this.navigationItem('codex', 'Codex')
-        ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false && site.id !== 'cpa'), (site: ServiceSite) => {
+        ForEach(this.services.filter((site: ServiceSite) => site.enabled !== false && site.id !== 'cpa' && site.id !== 'chat'), (site: ServiceSite) => {
           this.navigationItem(site.id, site.name)
         }, (site: ServiceSite) => site.id)
-      }.width('100%').height(56).backgroundColor('#F7F7F7').clip(true).attributeModifier(this.navigationMaterial())
+      }.width('100%').height(56).backgroundColor('#f8f8f5').clip(true).attributeModifier(this.navigationMaterial())
         .priorityGesture(LongPressGesture({ repeat: false, duration: 600 }).onAction(() => { this.openNavigationSettings(); }))
         .visibility((this.activeTab === 'codex' && this.connected && this.codeyUi.chat) ||
           (this.activeTab === 'chat' && !this.configId && this.chatInConversation) ? Visibility.None : Visibility.Visible)
-    }.width('100%').height('100%').backgroundColor('#f5f5f3')
+    }.width('100%').height('100%').backgroundColor('#f8f8f5')
       .bindSheet($$this.navigationSettings, this.navigationSettingsPanel(), { height: '70%', showClose: !this.savingNavigation,
-        backgroundColor: '#f5f5f3' })
+        backgroundColor: '#f8f8f5' })
   }
 }

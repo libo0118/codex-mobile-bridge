@@ -56,6 +56,17 @@ test('Chat disable, empty URL, custom address and restart round-trip without cha
   assert.throws(() => new h.ServiceSite('magpie', 'Magpie', 'https://example.test/?view=plugin-chat'));
 });
 
+test('loading legacy Chat preferences never rewrites or deletes the saved record', async () => {
+  for (const enabled of [true,false]) {
+    const saved=JSON.stringify({name:'Saved Chat',url:'https://example.test/chat/?view=plugin-chat',enabled});
+    const h=sites({chat:saved}), before=[...h.records];
+    const chat=(await h.store.load({})).find(site=>site.id==='chat');
+    assert.equal(chat.name,'Saved Chat'); assert.equal(chat.enabled,enabled);
+    assert.equal(chat.url,'https://example.test/chat/?view=plugin-chat');
+    assert.deepEqual([...h.records],before);
+  }
+});
+
 test('Chat settings reject secrets, fragment, non-HTTPS and malformed stored state', async () => {
   const h = sites(); await h.store.load({});
   for (const url of ['https://example.test/?token=secret', 'https://example.test/?view=plugin-chat&token=secret',

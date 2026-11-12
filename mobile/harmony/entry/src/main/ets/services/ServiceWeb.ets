@@ -276,7 +276,7 @@ export struct ServiceWeb {
           Image($r('app.media.keeper_header_more')).width(24).height(24).objectFit(ImageFit.Contain)
         }.width(44).height(44).padding(10).borderRadius(22).backgroundColor(Color.Transparent).enabled(this.active)
           .accessibilityText(this.site.name + ' 页面选项').bindMenu(this.pageMenu)
-      }.height(56).padding({ left: 16, right: 12 }).width('100%').backgroundColor('#f5f5f3')
+      }.height(56).padding({ left: 16, right: 12 }).width('100%').backgroundColor('#f8f8f5')
       if (this.status) { Text(this.status).fontSize(12).fontColor('#777b80').padding(6).width('100%') }
       Web({ src: this.initialURL, controller: this.controller })
         .javaScriptAccess(true).domStorageAccess(true).fileAccess(false).mixedMode(MixedMode.None).multiWindowAccess(false).geolocationAccess(false)
@@ -308,7 +308,7 @@ export struct ServiceWeb {
           }
         })
         .width('100%').layoutWeight(1)
-    }.width('100%').height('100%').backgroundColor('#f5f5f3')
+    }.width('100%').height('100%').backgroundColor('#f8f8f5')
   }
 
   build() {

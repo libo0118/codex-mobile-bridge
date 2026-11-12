@@ -2,6 +2,8 @@
 
 Status: implemented
 
+四入口与整块隐藏 Magpie 顶栏已由[三入口与内部导航决定](../bug-fix/2026-11-12-harmony-magpie-navigation.md)部分取代；尺寸、CPA 和原按钮接管原则继续保留。
+
 ## Problem
 
 悬浮胶囊底栏和 Chat 的单独尺寸继续占用竖向空间。Chat 列表头与 Magpie 品牌头重复 Native 顶栏；用户要求统一微信式底栏，并将 CPA 从常用入口移到更多菜单。
