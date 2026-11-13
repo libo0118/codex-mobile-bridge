@@ -77,8 +77,21 @@ export struct ServiceWeb {
           this.context.startAbility({ action: 'ohos.want.action.viewData', uri: target, entities: ['entity.system.browsable'] }).catch(() => {});
         } }
       });
-    }
+    } else this.status = '已拦截非本站跳转，请核对站点地址，或在系统浏览器打开。';
     return true;
+  }
+
+  private async openInBrowser(): Promise<void> {
+    if (!this.active || this.site.id !== 'muse') return;
+    try {
+      await this.context.startAbility({ action: 'ohos.want.action.viewData', uri: this.site.url, entities: ['entity.system.browsable'] });
+    } catch (_) { this.status = '无法打开系统浏览器，请手动打开 Muse 站点地址。'; }
+  }
+
+  private pageError(request: WebResourceRequest, message: string): void {
+    if (!request.isMainFrame()) return;
+    if (this.site.id === 'chat' && request.getRequestUrl() === this.currentURL) this.clearChat();
+    this.status = message;
   }
 
   private back(): void {
@@ -206,6 +219,9 @@ export struct ServiceWeb {
         MenuItem({ content: '网页返回' }).onClick(() => { this.back(); })
         MenuItem({ content: '登录信息' }).onClick(() => { if (this.active) this.loginRequest++; })
       }
+      if (this.site.id === 'muse') {
+        MenuItem({ content: '用系统浏览器打开 Muse' }).onClick(() => { this.openInBrowser(); })
+      }
       MenuItem({ content: '刷新页面' }).onClick(() => { if (this.active) this.controller.refresh(); })
       MenuItem({ content: '站点设置' }).onClick(() => { if (this.active) this.onConfigure(); })
     }
@@ -302,10 +318,10 @@ export struct ServiceWeb {
           }
         })
         .onErrorReceive((event) => {
-          if (event && event.request.isMainFrame()) {
-            if (this.site.id === 'chat' && event.request.getRequestUrl() === this.currentURL) this.clearChat();
-            this.status = '连接失败，请检查网络后手动刷新。';
-          }
+          if (event) this.pageError(event.request, '连接失败（错误码 ' + event.error.getErrorCode() + '），请检查网络后手动刷新。');
+        })
+        .onHttpErrorReceive((event) => {
+          if (event) this.pageError(event.request, '站点返回 HTTP ' + event.response.getResponseCode() + '，请检查站点地址或登录状态后手动刷新。');
         })
         .width('100%').layoutWeight(1)
     }.width('100%').height('100%').backgroundColor('#f8f8f5')

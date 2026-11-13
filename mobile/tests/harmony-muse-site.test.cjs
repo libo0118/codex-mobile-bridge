@@ -61,3 +61,77 @@ test('Muse redraw uses self-contained 24px vector marks, not the Chat bubble or 
     assert.doesNotMatch(svg, /<image|href=|script|display-p3/);
   }
 });
+
+function serviceWeb() {
+  const source = read('services/ServiceWeb.ets'), dialogs = [], launches = [], webCalls = [];
+  const logic = source.slice(0, source.indexOf('  @Builder')).replace(/@\w+(?:\([^()\n]*\))?\s*/g, '')
+    .replace('struct ServiceWeb', 'class ServiceWeb') + '\n}';
+  const context = vm.createContext({ getContext: () => ({ startAbility: async want => { launches.push(want); } }),
+    ServiceSite: class {}, webview: { WebCookieManager: { saveCookieAsync: async () => {} }, WebviewController: class {
+      loadUrl() { webCalls.push('loadUrl'); } refresh() { webCalls.push('refresh'); } runJavaScript() { webCalls.push('script'); return Promise.resolve(''); }
+    } }, AlertDialog: { show: dialog => dialogs.push(dialog) } });
+  vm.runInContext(strip(read('security/GatewayURL.ets') + '\n' + logic) + '\nthis.page = new ServiceWeb();', context);
+  context.page.site = { id: 'muse', url: 'https://muse.ai/', loginOrigin: 'https://muse.ai' };
+  context.page.active = true; context.page.initialURL = context.page.site.url; context.page.currentURL = context.page.site.url;
+  return { page: context.page, dialogs, launches, webCalls, emit(name, event) {
+    const start = source.indexOf('.' + name + '(');
+    assert.notEqual(start, -1, name + ' must be wired to the Web component');
+    const call = source.slice(start).split(/\r?\n        (?=\.[a-zA-Z])/)[0].trim();
+    const callback = call.slice(name.length + 2, -1);
+    return vm.runInContext('(function () { return ' + callback + '; }).call(page)', context)(event);
+  } };
+}
+const request = (url, main = true, gesture = false) => ({ getRequestUrl: () => url, isMainFrame: () => main, isRequestGesture: () => gesture });
+
+test('Muse #weblink stays same-origin through navigation and history callbacks without reload or DOM injection', () => {
+  const h = serviceWeb(), url = 'https://muse.ai/#weblink';
+  assert.equal(h.page.allowed(url), true);
+  assert.equal(h.emit('onLoadIntercept', { data: request(url) }), false);
+  h.emit('onPageBegin', { url }); h.emit('onPageEnd', { url });
+  h.emit('onRefreshAccessedHistory', { url }); h.page.activeChanged();
+  assert.equal(h.page.currentURL, url); assert.equal(h.page.initialURL, 'https://muse.ai/');
+  assert.equal(h.page.status, ''); assert.equal(h.dialogs.length, 0); assert.equal(h.launches.length, 0);
+  assert.deepEqual(h.webCalls, []);
+  assert.match(read('services/ServiceWeb.ets'), /Web\(\{ src: this\.initialURL, controller: this\.controller \}\)/);
+});
+
+test('blocked automatic top-level navigation is visible without opening an external app or leaking its URL', () => {
+  const h = serviceWeb(), target = 'https://external.example/login?code=private-code#private-token';
+  assert.equal(h.page.navigate(request(target)), true);
+  assert.match(h.page.status, /拦截/);
+  assert.doesNotMatch(h.page.status, /external|private-code|private-token/);
+  assert.equal(h.dialogs.length, 0); assert.equal(h.launches.length, 0);
+  h.page.status = '';
+  assert.equal(h.page.navigate(request('https://muse.ai/login')), false);
+  assert.equal(h.page.navigate(request(target, false)), false);
+  assert.equal(h.page.status, '');
+  assert.equal(h.page.navigate(request(target, true, true)), true);
+  assert.equal(h.dialogs.length, 1); assert.equal(h.launches.length, 0);
+});
+
+test('HTTP and network failures show numeric main-frame diagnostics, not page contents or subresource errors', () => {
+  const h = serviceWeb();
+  const failed = request('https://muse.ai/?private=token');
+  h.emit('onHttpErrorReceive', { request: failed, response: { getResponseCode: () => 403 } });
+  assert.match(h.page.status, /HTTP 403/); assert.doesNotMatch(h.page.status, /private|token/);
+  h.emit('onErrorReceive', { request: failed, error: { getErrorCode: () => -105 } });
+  assert.match(h.page.status, /-105/);
+  h.page.status = '';
+  h.emit('onHttpErrorReceive', { request: request('https://muse.ai/image', false), response: { getResponseCode: () => 404 } });
+  h.emit('onErrorReceive', { request: request('https://muse.ai/image', false), error: { getErrorCode: () => -105 } });
+  assert.equal(h.page.status, '');
+});
+
+test('Muse opens only its configured public URL in the system browser after an explicit active action', async () => {
+  const h = serviceWeb();
+  h.page.currentURL = 'https://muse.ai/login?private=token#secret';
+  assert.equal(h.launches.length, 0);
+  await h.page.openInBrowser();
+  assert.equal(h.launches.length, 1); assert.equal(h.launches[0].uri, 'https://muse.ai/');
+  h.page.active = false; await h.page.openInBrowser();
+  h.page.active = true; h.page.site.id = 'magpie'; await h.page.openInBrowser();
+  assert.equal(h.launches.length, 1);
+  h.page.site.id = 'muse'; h.page.context.startAbility = async () => { throw new Error('unavailable'); };
+  await h.page.openInBrowser(); assert.match(h.page.status, /无法打开系统浏览器/);
+  assert.match(read('services/ServiceWeb.ets'), /MenuItem\(\{ content: '用系统浏览器打开 Muse' \}\)\.onClick\(\(\) => \{ this\.openInBrowser\(\); \}\)/);
+});

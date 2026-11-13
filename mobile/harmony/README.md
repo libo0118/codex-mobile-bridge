@@ -11,7 +11,7 @@ ArkTS / ArkUI + ArkWeb 原生外壳，复用电脑网关的 `web/` 页面和 `mo
 - **CPA**：首次点击后在应用内填写真实 HTTPS 管理地址，不预设未知服务器地址。
 - **Magpie**：预置无密钥基址 `https://libo.siasunagv.cn/magpie/`，地址可配置。内部原导航完整保留，包括会话、各管理页及动态注册的“对话”插件。兼容旧顶栏与新版 `side-nav` 的设置入口；只隐藏由原生刷新、设置等价接管的原控件，不整块隐藏网页顶栏、侧栏或网关选择。未知结构保留原 UI。若服务返回 401 并要求启动链接，在“登录信息”选择“私密入口链接”，仅在本机输入启动服务时提供的完整 HTTPS 链接。
 
-- **Muse**：预置 `https://muse.ai/`，在原独立 Chat 的可见位置提供常驻网页入口；使用现有网页返回、登录信息与更多菜单，不注入 Chat/Magpie 脚本或代为登录。手写 M 图标按官网默认 favicon 重绘为本地 SVG，未选中深灰、选中蓝色。站点及凭据独立保存，不读取或迁移旧 Chat 记录。
+- **Muse**：预置 `https://muse.ai/`，在原独立 Chat 的可见位置提供常驻网页入口；使用现有网页返回、登录信息与更多菜单，不注入 Chat/Magpie 脚本或代为登录。若页面空白，可在 **••• → 用系统浏览器打开 Muse** 主动打开已配置的公开地址；不转交当前页面的查询参数、片段或登录数据。主框架网络／HTTP 错误和被拦截的自动外站跳转会在标题栏下提示，但不能据此判断所有白屏原因。`#weblink` 是允许的同源片段变化，不会触发外壳重新加载。手写 M 图标按官网默认 favicon 重绘为本地 SVG，未选中深灰、选中蓝色。站点及凭据独立保存，不读取或迁移旧 Chat 记录。
 
 历史独立 Chat 的 Preferences、Cookie、登录信息和对话数据不删除、不清空，也不自动迁移到 Magpie 或 Muse；Muse 使用独立站点和凭据 ID。
 
@@ -70,11 +70,13 @@ python -B scripts/build-mobile-harmony.py
 
 GitHub Actions 的 **HarmonyOS unsigned HAP** 工作流支持手动执行，并在指定鸿蒙分支相关文件更新后执行。成功后下载 `mobile-HarmonyOS-unsigned` artifact。CI 编译成功与真机操作验证是两种不同证据。
 
+每次交付 HAP 更新都递增 `versionName` 和 `versionCode`，同步根包、Harmony 包清单、“关于”和 UA 中的版本；保留应用身份与签名，不用旧版本号标记新包。
+
 ## 安装和验证范围
 
 Actions 默认生成 **未签名 HAP**。安装到真实设备前，需要在自己的 HarmonyOS 开发环境中配置开发者签名与设备授权；应用签名、私钥和设备资料不提交仓库。保持同一应用身份和签名，才可按系统规则升级保留数据。
 
-UA 包含真实 `BridgeMobile/2.1.1-HarmonyOS` 标记及旧网关兼容标记 `BridgeMobile/2.1.1-Android`。新网关优先识别 HarmonyOS，现成旧网关仍可沿用移动端绑定流程。UA 只用于宿主兼容提示；配对、Cookie、CSRF 与原生来源校验仍然适用。
+UA 包含真实 `BridgeMobile/2.1.2-HarmonyOS` 标记及旧网关兼容标记 `BridgeMobile/2.1.2-Android`。新网关优先识别 HarmonyOS，现成旧网关仍可沿用移动端绑定流程。UA 只用于宿主兼容提示；配对、Cookie、CSRF 与原生来源校验仍然适用。
 
 本分支网关只将已有服务器可信标记的有限期设备会话迁移为长期可信。普通浏览器或缺少该标记的旧会话保持原有效期与正常续期规则，不会因请求 UA 改变而成为永久可信；到期后重新登录或扫码配对。
 

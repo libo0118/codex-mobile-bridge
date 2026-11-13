@@ -917,8 +917,8 @@ struct Index {
       MenuItem({ content: this.L('刷新页面', 'Refresh') }).onClick(() => { this.controller.refresh(); })
       MenuItem({ content: this.alerts ? this.L('关闭前台任务通知', 'Disable foreground alerts') : this.L('开启前台任务通知', 'Enable foreground alerts') }).onClick(() => { this.toggleAlerts(); })
       MenuItem({ content: this.L('关于鸿蒙版', 'About HarmonyOS') }).onClick(() => {
-        this.message(this.L('Codex Mobile Bridge 2.1.1 · HarmonyOS\n聊天、配对与文件管理沿用电脑网关。任务通知仅当前电脑、App 前台有效；首版不含后台推送和设备密钥凭据恢复。下一次附件下载上限：',
-          'Codex Mobile Bridge 2.1.1 · HarmonyOS\nChats, pairing and files use your gateway. Alerts run for the current computer while this app is visible. Background push and encrypted credential recovery are not included. Next attachment limit: ') + this.downloadLimitMiB.toString() + ' MB.');
+        this.message(this.L('Codex Mobile Bridge 2.1.2 · HarmonyOS\n聊天、配对与文件管理沿用电脑网关。任务通知仅当前电脑、App 前台有效；首版不含后台推送和设备密钥凭据恢复。下一次附件下载上限：',
+          'Codex Mobile Bridge 2.1.2 · HarmonyOS\nChats, pairing and files use your gateway. Alerts run for the current computer while this app is visible. Background push and encrypted credential recovery are not included. Next attachment limit: ') + this.downloadLimitMiB.toString() + ' MB.');
       })
     }
   }
@@ -1004,7 +1004,7 @@ struct Index {
             .javaScriptAccess(true).domStorageAccess(true).fileAccess(false).mixedMode(MixedMode.None).multiWindowAccess(false).geolocationAccess(false)
             .onControllerAttached(() => {
               // Older gateways recognize the Android suffix; the first token identifies the real host to newer gateways.
-              session.controller.setCustomUserAgent(session.controller.getUserAgent() + ' BridgeMobile/2.1.1-HarmonyOS BridgeMobile/2.1.1-Android');
+              session.controller.setCustomUserAgent(session.controller.getUserAgent() + ' BridgeMobile/2.1.2-HarmonyOS BridgeMobile/2.1.2-Android');
             })
             .onPageBegin(() => { this.gatewayPageBegin(session); })
             .onPageEnd((event) => { if (event) this.gatewayPageFinished(session, event.url); })
