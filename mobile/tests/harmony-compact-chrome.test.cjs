@@ -79,14 +79,14 @@ test('all visible tabs share a flat 56vp row and CPA remains reachable from both
   assert.match(tabs,/chatInConversation\) \? Visibility\.None/);
 });
 
-test('native navigation exposes only Codex, Keeper and Magpie, without Chat configuration entries',()=>{
+test('native navigation exposes Codex, Keeper, Magpie and Muse, without legacy Chat configuration entries',()=>{
   const index=read('pages/Index.ets');
   const filters=[...index.matchAll(/this\.services\.filter\(\(site: ServiceSite\) => ([^\n]+?)\),/g)];
   assert.equal(filters.length,2, 'both bottom tabs and the in-conversation switch menu are checked');
-  const services=[{id:'keeper'},{id:'cpa'},{id:'magpie'},{id:'chat',name:'Saved Chat',enabled:true}];
+  const services=[{id:'keeper'},{id:'cpa'},{id:'magpie'},{id:'muse'},{id:'chat',name:'Saved Chat',enabled:true}];
   for (const [,predicate] of filters) {
     const visible=services.filter(new Function('site','return '+predicate));
-    assert.deepEqual(visible.map(site=>site.id),['keeper','magpie']);
+    assert.deepEqual(visible.map(site=>site.id),['keeper','magpie','muse']);
   }
   const builders=index.slice(index.indexOf('  private gatewayMenu()'));
   assert.doesNotMatch(builders,/Chat 设置|Chat settings|Enable Chat|启用 Chat|configureChat/);

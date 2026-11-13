@@ -34,6 +34,7 @@ export class ServiceStore {
     this.prefs = await preferences.getPreferences(context, { name: 'bridge-services' });
     const sites = [new ServiceSite('keeper', 'Keeper', 'https://libo.siasunagv.cn/keeper/'),
       new ServiceSite('cpa', 'CPA', ''), new ServiceSite('magpie', 'Magpie', 'https://libo.siasunagv.cn/magpie/'),
+      new ServiceSite('muse', 'Muse', 'https://muse.ai/'),
       new ServiceSite('chat', 'Chat', 'https://libo.siasunagv.cn/magpie/?view=plugin-chat')];
     for (const site of sites) {
       if (site.id === 'keeper') continue;
@@ -59,7 +60,7 @@ export class ServiceStore {
   }
 
   async save(site: ServiceSite): Promise<void> {
-    if (!this.prefs || (site.id !== 'cpa' && site.id !== 'magpie' && site.id !== 'chat')) throw new Error('此站点地址不能修改');
+    if (!this.prefs || (site.id !== 'cpa' && site.id !== 'magpie' && site.id !== 'muse' && site.id !== 'chat')) throw new Error('此站点地址不能修改');
     if (site.id === 'chat' && typeof site.enabled !== 'boolean') throw new Error('站点启用状态无效');
     const url = site.id === 'chat' && site.enabled === false && !site.url.trim() ? '' :
       site.id === 'chat' ? chatServiceURL(site.url) : serviceURL(site.url);

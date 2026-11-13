@@ -22,14 +22,15 @@ function sites(initial = {}) {
   return { ...context.api, records, store: new context.api.ServiceStore() };
 }
 
-test('Chat is appended enabled with an exact deep link while existing rows stay enabled', async () => {
+test('Muse is added independently while legacy Chat keeps its exact deep link and existing rows stay enabled', async () => {
   const h = sites({ cpa: JSON.stringify({ name: 'Old CPA', url: 'https://example.test/cpa/' }),
     magpie: JSON.stringify({ name: 'Magpie', url: 'https://example.test/magpie/' }) });
   const list = await h.store.load({});
-  assert.deepEqual(Array.from(list, item => item.id), ['keeper', 'cpa', 'magpie', 'chat']);
-  assert.deepEqual(Array.from(list, item => item.enabled), [true, true, true, true]);
-  assert.equal(list[3].url, defaultURL);
-  assert.equal(list[3].loginOrigin, 'https://libo.siasunagv.cn');
+  assert.deepEqual(Array.from(list, item => item.id), ['keeper', 'cpa', 'magpie', 'muse', 'chat']);
+  assert.deepEqual(Array.from(list, item => item.enabled), [true, true, true, true, true]);
+  const legacyChat = list.find(site => site.id === 'chat');
+  assert.equal(legacyChat.url, defaultURL);
+  assert.equal(legacyChat.loginOrigin, 'https://libo.siasunagv.cn');
   assert.equal(list[1].name, 'Old CPA');
   assert.equal(new h.ServiceSite('magpie', 'M', 'https://example.test/m/', 'https://login.example.test').loginOrigin,
     'https://login.example.test', 'the fourth constructor argument is unchanged');

@@ -77,6 +77,188 @@ function page({checkbox = false, ack = true, sheet = true, frame = false, href =
   return {doc,workspace,list,footer,heading,archive,consoleButton,logout,back,clicks,states,rules,observers,listeners,context,run,flush,action,pending:()=>timers.size};
 }
 
+// A schema-only tree: no released Codey classes, heading/host shape or Chinese control labels.
+function contractPage({scene = 'list', ack = true, frame = false, href = url} = {}) {
+  const states = [], clicks = [], rules = [], writes = [], observers = [], listeners = new Map(), timers = new Map(); let timer = 0;
+  const node = (tag = 'DIV', attrs = {}) => {
+    const n = element(tag, '', attrs); n.nodeType = 1;
+    n.matches = selector => selector.split(',').some(part => {
+      if (part === 'button') return n.tagName === 'BUTTON';
+      if (part[0] === '.') return (n.getAttribute('class') || '').split(' ').includes(part.slice(1));
+      const attr = part.match(/^\[([^=\]]+)(?:="([^"]*)")?\]$/);
+      return !!attr && n.getAttribute(attr[1]) !== null && (attr[2] === undefined || n.getAttribute(attr[1]) === attr[2]);
+    });
+    n.closest = selector => { for (let p = n; p; p = p.parentElement) if (p.matches(selector)) return p; };
+    n.contains = other => { for (let p = other; p; p = p.parentElement) if (p === n) return true; return false; };
+    n.append = child => { child.remove(); n.children.push(child); child.parentElement = n; return child; };
+    n.remove = () => { if (n.parentElement) n.parentElement.children = n.parentElement.children.filter(child => child !== n); n.parentElement = undefined; };
+    Object.defineProperty(n, 'isConnected', {get:()=> n === doc || !!n.parentElement?.isConnected});
+    n.querySelectorAll = selector => {
+      const space = selector.indexOf(' '), ancestor = space < 0 ? '' : selector.slice(0,space), target = space < 0 ? selector : selector.slice(space+1);
+      const found = []; const walk = parent => { for (const child of parent.children) {
+        if (child.matches(target) && (!ancestor || child.parentElement?.closest(ancestor))) found.push(child); walk(child);
+      } }; walk(n); return found;
+    };
+    n.querySelector = selector => n.querySelectorAll(selector)[0];
+    const set = n.setAttribute, remove = n.removeAttribute;
+    n.setAttribute = (name,value) => { if (name.startsWith('data-hos-')) writes.push([name,value]); set.call(n,name,value); };
+    n.removeAttribute = name => { if (name.startsWith('data-hos-')) writes.push([name,null]); remove.call(n,name); };
+    return n;
+  };
+  const doc = node('DOCUMENT'), html = doc.append(node('HTML')), body = html.append(node('BODY'));
+  const root = body.append(node('MAIN',{id:'root'})), shell = root.append(node('DIV',{class:'remote-shell'}));
+  const wrapper = shell.append(node()), workspace = wrapper.append(node('SECTION',{'data-codey-ui':'2','data-codey-scene':scene}));
+  const header = workspace.append(node('DIV',{'data-codey-chrome':'header'})), content = workspace.append(node());
+  const footer = workspace.append(node('DIV',{'data-codey-chrome':'footer'}));
+  const archive = footer.append(node('DIV',{'data-codey-action':'archive',role:'button','aria-pressed':'false'}));
+  const consoleButton = footer.append(node('DIV',{'data-codey-action':'console',role:'button'}));
+  const logout = footer.append(node('BUTTON',{'data-codey-action':'logout'}));
+  const back = node('DIV',{'data-codey-action':'back',role:'button'}), consoleBack = node('BUTTON',{'data-codey-console-back':''});
+  const setScene = value => { workspace.setAttribute('data-codey-scene',value); back.remove(); if (value !== 'list') header.append(back); };
+  const panel = active => { if (active) { wrapper.setAttribute('hidden',''); shell.append(consoleBack); } else { wrapper.removeAttribute('hidden'); consoleBack.remove(); } };
+  setScene(scene);
+  archive.click = () => { clicks.push('archive'); archive.setAttribute('aria-pressed',String(archive.getAttribute('aria-pressed') !== 'true')); };
+  consoleButton.click = () => { clicks.push('console'); panel(true); };
+  logout.click = () => { clicks.push('logout'); workspace.remove(); consoleBack.remove(); };
+  back.click = () => { clicks.push('back'); setScene('list'); };
+  consoleBack.click = () => { clicks.push('console-back'); panel(false); };
+  doc.body = body; doc.documentElement = html; doc.getElementById = id => id === 'root' ? root : undefined;
+  doc.addEventListener = (name,fn) => listeners.set(name,fn);
+  doc.styleSheets = [{href:url+'bundle.css',cssRules:rules,insertRule:(rule,index)=>rules.splice(index,0,rule),deleteRule:index=>rules.splice(index,1)}];
+  const location = {href,get origin() { return new URL(this.href).origin; }};
+  const context = vm.createContext({URL,document:doc,location,requestAnimationFrame:fn=>{timers.set(++timer,fn);return timer;},
+    MutationObserver:class { constructor(fn) { this.callback=fn; observers.push(this); } observe(target,options) { this.options=options; } },
+    prompt:(command,value)=>{assert.equal(command,'codexbridge-codey-ui:token');states.push(JSON.parse(value));return ack ? 'saved' : null;},
+    addEventListener:(name,fn)=>listeners.set(name,fn)});
+  context.window=context; context.top=frame ? {} : context;
+  const run = () => vm.runInContext(s.codeyUiScript(url,'token'),context);
+  const action = command => vm.runInContext(s.codeyUiActionScript(url,command),context);
+  const flush = () => { const pending=[...timers.values()];timers.clear();pending.forEach(fn=>fn(100)); };
+  const mutate = (target,attributeName) => observers[0].callback([{type:'attributes',target,attributeName}]);
+  return {doc,root,shell,wrapper,workspace,header,content,footer,archive,consoleButton,logout,back,consoleBack,node,setScene,panel,
+    context,states,clicks,rules,writes,observers,listeners,run,action,flush,mutate,pending:()=>timers.size};
+}
+
+test('explicit v2 list/create/conversation use only schema controls and reserve native chrome after acknowledgement', () => {
+  for (const scene of ['list','create','conversation']) {
+    const h=contractPage({scene}); h.run();
+    assert.equal(h.states.at(-1).supported,true); assert.equal(h.states.at(-1).chat,scene !== 'list');
+    assert.equal(h.states.at(-1).canBack,scene !== 'list'); assert.equal(h.footer.getAttribute('data-hos-codey-footer'),'');
+    assert.equal(h.header.getAttribute('data-hos-codey-v2-header'),''); assert.equal(h.workspace.getAttribute('data-hos-codey-header'),null);
+    assert.ok(h.rules.some(rule=>rule.includes('[data-hos-codey-v2-header]') && rule.includes('padding-right:64px')));
+    assert.deepEqual(h.clicks,[]); const writes=h.writes.length; h.context.__bridgeHarmonyCodeyUi.sync(); assert.equal(h.writes.length,writes);
+    if (scene !== 'list') { assert.equal(h.action('back'),'clicked');h.flush();assert.equal(h.states.at(-1).chat,false); }
+  }
+  const rejected=contractPage({scene:'create',ack:false});rejected.run();
+  assert.equal(rejected.footer.getAttribute('data-hos-codey-footer'),null);assert.equal(rejected.header.getAttribute('data-hos-codey-v2-header'),null);
+  for (const action of ['archive','console','logout','back']) assert.equal(rejected.action(action),'unavailable');
+  assert.equal(vm.runInContext(s.BACK_SCRIPT,rejected.context),false);assert.deepEqual(rejected.clicks,[]);
+});
+
+test('v2 actions click originals; console uses its unique outer back and keeps only logout available', () => {
+  const h=contractPage({scene:'conversation'});h.run();
+  assert.equal(h.action('archive'),'clicked');h.flush();assert.equal(h.states.at(-1).archived,true);
+  assert.equal(h.action('console'),'clicked');h.flush();
+  assert.equal(h.states.at(-1).chat,false);assert.equal(h.states.at(-1).canArchive,false);assert.equal(h.states.at(-1).canConsole,false);
+  assert.equal(h.states.at(-1).canLogout,true);assert.equal(h.states.at(-1).canBack,true);
+  assert.equal(h.action('archive'),'unavailable');assert.equal(h.action('console'),'unavailable');
+  h.consoleBack.disabled=true;h.context.__bridgeHarmonyCodeyUi.sync();assert.equal(h.states.at(-1).canBack,false);
+  assert.equal(vm.runInContext(s.BACK_SCRIPT,h.context),true);assert.deepEqual(h.clicks,['archive','console']);
+  h.consoleBack.disabled=false;assert.equal(h.action('back'),'clicked');h.flush();assert.equal(h.states.at(-1).chat,true);
+  assert.deepEqual(h.clicks,['archive','console','console-back']);
+  h.panel(true);h.context.__bridgeHarmonyCodeyUi.sync();assert.equal(h.action('logout'),'clicked');h.flush();
+  assert.equal(h.states.at(-1).supported,false);assert.equal(h.footer.getAttribute('data-hos-codey-footer'),null);
+  assert.equal(h.header.getAttribute('data-hos-codey-v2-header'),null);assert.equal(h.doc.documentElement.getAttribute('data-hos-codey-page'),null);
+});
+
+test('v2 disabled and aria-disabled controls never dispatch original clicks', () => {
+  for (const [action,field] of [['archive','canArchive'],['console','canConsole'],['logout','canLogout'],['back','canBack']]) {
+    for (const disabled of ['disabled','disabled-attribute','aria-disabled']) {
+      const h=contractPage({scene:'create'}), control=action === 'console' ? h.consoleButton : h[action];
+      if (disabled === 'disabled') control.disabled=true;else control.setAttribute(disabled === 'disabled-attribute' ? 'disabled' : 'aria-disabled','true');
+      h.run();assert.equal(h.states.at(-1).supported,true);assert.equal(h.states.at(-1)[field],false);
+      assert.equal(h.action(action),'unavailable');assert.deepEqual(h.clicks,[]);
+    }
+  }
+});
+
+test('v2 malformed scene, pressed state, chrome or action structure withdraw every takeover marker', () => {
+  const failures = [
+    h=>h.workspace.setAttribute('data-codey-ui','3'), h=>h.workspace.setAttribute('data-codey-scene','other'),
+    h=>h.workspace.removeAttribute('data-codey-scene'), h=>h.archive.setAttribute('aria-pressed','mixed'),h=>h.archive.removeAttribute('aria-pressed'),
+    h=>h.header.remove(),h=>h.footer.remove(),h=>h.workspace.append(h.node('DIV',{'data-codey-chrome':'footer'})),
+    h=>h.workspace.append(h.node('DIV',{'data-codey-chrome':'header'})),h=>h.shell.append(h.node('DIV',{'data-codey-ui':'2'})),
+    h=>h.archive.remove(),h=>h.consoleButton.remove(),h=>h.logout.remove(),h=>h.back.remove(),
+    h=>h.footer.append(h.node('BUTTON',{'data-codey-action':'archive'})),h=>h.footer.append(h.node('BUTTON',{'data-codey-action':'console'})),
+    h=>h.footer.append(h.node('BUTTON',{'data-codey-action':'logout'})),h=>h.header.append(h.node('BUTTON',{'data-codey-action':'back'})),
+    h=>h.consoleButton.removeAttribute('role'),h=>h.content.append(h.archive),h=>h.footer.append(h.node('BUTTON',{'data-codey-action':'other'})),
+    h=>{h.panel(true);h.consoleBack.remove();},h=>{h.panel(true);h.shell.append(h.node('BUTTON',{'data-codey-console-back':''}));},
+    h=>{h.panel(true);h.workspace.append(h.consoleBack);}
+  ];
+  for (const change of failures) {
+    const h=contractPage({scene:'create'});h.run();change(h);
+    assert.equal(h.action('logout'),'unavailable');assert.equal(h.states.at(-1).supported,false);
+    assert.equal(h.footer.getAttribute('data-hos-codey-footer'),null);assert.equal(h.header.getAttribute('data-hos-codey-v2-header'),null);
+    assert.equal(h.doc.documentElement.getAttribute('data-hos-codey-page'),null);assert.deepEqual(h.clicks,[]);
+  }
+  const list=contractPage();list.header.append(list.back);list.run();assert.equal(list.states.at(-1).supported,false);
+});
+
+test('explicit unknown or invalid schema never falls back to the released DOM collector', () => {
+  for (const version of ['2','1','3','']) {
+    const h=page(), explicit=element('SECTION','',{'data-codey-ui':version});
+    h.doc.queries.set('.remote-shell [data-codey-ui]',[explicit]);h.run();
+    assert.equal(h.states.at(-1).supported,false);assert.equal(h.footer.getAttribute('data-hos-codey-footer'),null);
+    assert.equal(h.action('logout'),'unavailable');assert.deepEqual(h.clicks,[]);
+  }
+});
+
+test('v2 schema mutations resynchronize reused roots, disabled controls, panels and removed/repaired structure', () => {
+  const h=contractPage();h.run();const observer=h.observers[0];
+  for (const attribute of ['data-codey-ui','data-codey-scene','data-codey-action','data-codey-chrome','data-codey-console-back','disabled','aria-disabled','aria-pressed']) {
+    assert.ok(observer.options.attributeFilter.includes(attribute),attribute);
+  }
+  for (const scene of ['create','conversation','list']) {h.setScene(scene);h.mutate(h.workspace,'data-codey-scene');h.flush();assert.equal(h.states.at(-1).chat,scene !== 'list');}
+  h.archive.setAttribute('aria-pressed','true');h.mutate(h.archive,'aria-pressed');h.flush();assert.equal(h.states.at(-1).archived,true);
+  h.consoleButton.setAttribute('aria-disabled','true');h.mutate(h.consoleButton,'aria-disabled');h.flush();assert.equal(h.states.at(-1).canConsole,false);
+  h.panel(true);h.mutate(h.wrapper,'hidden');h.flush();assert.equal(h.states.at(-1).canBack,true);
+  h.panel(false);h.consoleButton.removeAttribute('data-codey-action');h.mutate(h.consoleButton,'data-codey-action');h.flush();
+  assert.equal(h.states.at(-1).supported,false);assert.equal(h.footer.getAttribute('data-hos-codey-footer'),null);
+  h.consoleButton.setAttribute('data-codey-action','console');h.mutate(h.consoleButton,'data-codey-action');h.flush();assert.equal(h.states.at(-1).supported,true);
+  h.footer.remove();observer.callback([{type:'childList',target:h.workspace,addedNodes:[],removedNodes:[h.footer]}]);h.flush();assert.equal(h.states.at(-1).supported,false);
+  h.workspace.append(h.footer);observer.callback([{type:'childList',target:h.workspace,addedNodes:[h.footer],removedNodes:[]}]);h.flush();assert.equal(h.states.at(-1).supported,true);
+  h.workspace.setAttribute('data-codey-ui','9');h.mutate(h.workspace,'data-codey-ui');h.flush();assert.equal(h.states.at(-1).supported,false);
+});
+
+test('v2 streaming/input text, ordinary transcript children and scrolls cause no scan, notification or takeover writes', () => {
+  const h=contractPage({scene:'conversation'});h.run();const notifications=h.states.length,writes=h.writes.length;
+  const message=h.content.append(h.node()), input=h.content.append(h.node('TEXTAREA'));
+  for (let i=0;i<50;i++) {
+    h.observers[0].callback([{type:'characterData',target:{nodeType:3,parentElement:message}}]);
+    h.observers[0].callback([{type:'childList',target:message,addedNodes:[{nodeType:3}],removedNodes:[]}]);
+    h.observers[0].callback([{type:'childList',target:h.content,addedNodes:[h.node()],removedNodes:[]}]);
+    input.value='draft '+i;h.content.scrollTop=i;h.mutate(message,'class');
+  }
+  assert.equal(h.pending(),0);assert.equal(h.states.length,notifications);assert.equal(h.writes.length,writes);
+  h.listeners.get('resize')();h.flush();assert.equal(h.states.length,notifications);assert.equal(h.writes.length,writes);
+});
+
+test('v2 top-frame/exact-URL guards and nonce refusal preserve original navigation', () => {
+  for (const options of [{frame:true},{href:url+'other'},{href:'https://other.example/'}]) {
+    const h=contractPage(options);assert.equal(h.run(),'changed');assert.equal(h.observers.length,0);assert.equal(h.writes.length,0);
+  }
+  for (const change of [h=>{h.context.location.href=url+'other';},h=>{h.context.top={};}]) {
+    const h=contractPage({scene:'create'});h.run();change(h);assert.equal(h.action('back'),'changed');
+    assert.equal(h.states.at(-1).supported,false);assert.equal(h.footer.getAttribute('data-hos-codey-footer'),null);
+    assert.equal(h.header.getAttribute('data-hos-codey-v2-header'),null);assert.equal(h.action('back'),'changed');assert.deepEqual(h.clicks,[]);
+  }
+  const rejected=contractPage();rejected.context.prompt=(command,value)=>{assert.equal(command,'codexbridge-codey-ui:token');rejected.states.push(JSON.parse(value));return null;};
+  rejected.run();assert.equal(rejected.writes.length,0);assert.equal(rejected.action('archive'),'unavailable');assert.deepEqual(rejected.clicks,[]);
+  const refresh=contractPage({scene:'create'});refresh.run();refresh.context.prompt=()=>null;refresh.run();
+  assert.equal(refresh.footer.getAttribute('data-hos-codey-footer'),null);assert.equal(refresh.header.getAttribute('data-hos-codey-v2-header'),null);
+  assert.equal(refresh.action('back'),'unavailable');assert.deepEqual(refresh.clicks,[]);
+});
+
 test('Codey host compacts only after native acknowledgement, without moving React nodes or executing actions', () => {
   const h = page(); h.run();
   assert.equal(h.states.at(-1).supported, true); assert.equal(h.states.at(-1).chat, false);
@@ -217,6 +399,22 @@ function nativePage(h) {
   };
   return {native,controller,requests,replies};
 }
+
+test('v2 focused scenes reuse the native dock, original Web and foreground-only acknowledgement on tab return', async () => {
+  for (const scene of ['create','conversation']) {
+    for (const tab of ['keeper','cpa','magpie']) {
+      const h=contractPage({scene}),{native,controller,replies}=nativePage(h),input=h.content.append(h.node('TEXTAREA'));
+      input.value='unsent draft';h.content.scrollTop=129.7;h.run();assert.equal(dock(native),'hidden');
+      native.selectTab(tab);h.setScene('list');h.context.__bridgeHarmonyCodeyUi.sync();
+      assert.equal(replies.at(-1),null);assert.equal(h.footer.getAttribute('data-hos-codey-footer'),null);
+      native.selectTab('codex');await new Promise(setImmediate);
+      assert.equal(replies.at(-1),'saved');assert.equal(dock(native),'visible');assert.equal(native.codeyUi.supported,true);
+      assert.equal(native.controller,controller);assert.equal(h.content.children[0],input);assert.equal(input.value,'unsent draft');
+      assert.equal(h.content.scrollTop,129.7);assert.deepEqual(h.clicks,[]);
+      native.token='new-token';h.run();assert.equal(replies.at(-1),null);assert.equal(h.header.getAttribute('data-hos-codey-v2-header'),null);
+    }
+  }
+});
 
 test('returning from Keeper refreshes rejected background list state without any new DOM mutation or Web reload', async () => {
   const h = page(), {native,controller,replies} = nativePage(h);

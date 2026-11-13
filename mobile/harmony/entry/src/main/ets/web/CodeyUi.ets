@@ -19,7 +19,7 @@ export function decodeCodeyUiState(value: string): CodeyUiState | undefined {
   } catch (_) { return undefined; }
 }
 
-// shortcut: recognize public Codey DOM; unknown controls keep their original UI until explicitly supported.
+// Note: explicit v2 DOM and released v1 fallback keep the same native authorization boundary.
 export const CODEY_UI_SCRIPT: string = String.raw`((notify, expectedURL) => {
   if (!document.body || !document.getElementById('root')) return 'unavailable';
   const key = '__bridgeHarmonyCodeyUi';
@@ -28,11 +28,36 @@ export const CODEY_UI_SCRIPT: string = String.raw`((notify, expectedURL) => {
   const q = (selector, root = doc) => root.querySelector(selector);
   const all = (selector, root) => Array.from(root.querySelectorAll(selector));
   const text = node => (node?.textContent || '').replace(/\s+/g, ' ').trim();
-  const enabled = node => !!node && node.isConnected && !node.disabled && node.getAttribute('aria-disabled') !== 'true';
+  const enabled = node => !!node && node.isConnected && !node.disabled && node.getAttribute('disabled') === null && node.getAttribute('aria-disabled') !== 'true';
   const allowed = () => window === window.top && location.href === expectedURL;
   const empty = {supported:false, chat:false, archived:false, canArchive:false, canConsole:false, canLogout:false, canBack:false};
-  let previous = '', styled = false, scheduled = 0, marked;
+  let previous = '', styled = false, scheduled = 0, marked, explicitRoot;
   function collect() {
+    const roots = all('.remote-shell [data-codey-ui]', doc);
+    explicitRoot = roots[0];
+    if (roots.length) return roots.length === 1 && explicitRoot.getAttribute('data-codey-ui') === '2' ? collectV2(explicitRoot) : undefined;
+    return collectV1();
+  }
+  function collectV2(workspace) {
+    const scene = workspace.getAttribute('data-codey-scene');
+    if (!['list','create','conversation'].includes(scene)) return;
+    const footers = all('[data-codey-chrome="footer"]', workspace), headers = all('[data-codey-chrome="header"]', workspace);
+    const controls = all('[data-codey-action]', workspace), focused = scene !== 'list';
+    if (footers.length !== 1 || headers.length !== 1 || controls.length !== (focused ? 4 : 3)) return;
+    const footer = footers[0], v2header = headers[0];
+    const find = action => controls.filter(node => node.getAttribute('data-codey-action') === action);
+    const archives = find('archive'), consoles = find('console'), logouts = find('logout'), backs = find('back');
+    if (archives.length !== 1 || consoles.length !== 1 || logouts.length !== 1 || backs.length !== (focused ? 1 : 0) ||
+      !controls.every(clickable) || ![archives[0],consoles[0],logouts[0]].every(node => footer.contains(node)) ||
+      !['true','false'].includes(archives[0].getAttribute('aria-pressed'))) return;
+    const panel = !!workspace.closest('[hidden]');
+    const consoleBacks = panel ? all('.remote-shell [data-codey-console-back]', doc) : [];
+    if (panel && (consoleBacks.length !== 1 || !clickable(consoleBacks[0]) || workspace.contains(consoleBacks[0]))) return;
+    return {workspace, footer, v2header, panel, back:panel ? consoleBacks[0] : backs[0],
+      archive:archives[0], console:consoles[0], logout:logouts[0], chat:!panel && focused};
+  }
+  const clickable = node => node.matches('button,[role="button"]') && typeof node.click === 'function';
+  function collectV1() {
     const workspace = q('.remote-shell .remote-codex-workspace');
     const list = workspace && q(':scope > .remote-thread-list', workspace);
     const footer = list && q(':scope > .remote-sidebar-footer', list);
@@ -64,6 +89,7 @@ export const CODEY_UI_SCRIPT: string = String.raw`((notify, expectedURL) => {
     try {
       for (const rule of [
         '[data-hos-codey-footer] { display:none !important; }',
+        '[data-hos-codey-v2-header] { padding-right:64px !important; }',
         'html[data-hos-codey-page] .remote-chat-header, html[data-hos-codey-page] .remote-topbar { padding-right:64px; }',
         '[data-hos-codey-header] > .remote-thread-list { display:grid; grid-template-columns:max-content minmax(0,1fr) 44px 44px 48px; grid-template-rows:60px auto minmax(0,1fr); column-gap:2px; padding:0 12px; }',
         '[data-hos-codey-header] .remote-list-heading { display:contents; }',
@@ -83,10 +109,16 @@ export const CODEY_UI_SCRIPT: string = String.raw`((notify, expectedURL) => {
     } catch (_) { while (sheet.cssRules.length > start) sheet.deleteRule(start); }
     return styled;
   }
+  function mark(node, name, active) {
+    if (!node) return;
+    if (active) { if (node.getAttribute(name) !== '') node.setAttribute(name, ''); }
+    else if (node.getAttribute(name) !== null) node.removeAttribute(name);
+  }
   function clear() {
-    marked?.workspace.removeAttribute('data-hos-codey-header');
-    marked?.footer.removeAttribute('data-hos-codey-footer');
-    html.removeAttribute('data-hos-codey-page'); marked = undefined;
+    mark(marked?.workspace, 'data-hos-codey-header', false);
+    mark(marked?.v2header, 'data-hos-codey-v2-header', false);
+    mark(marked?.footer, 'data-hos-codey-footer', false);
+    mark(html, 'data-hos-codey-page', false); marked = undefined;
   }
   function sync() {
     scheduled = 0;
@@ -98,35 +130,46 @@ export const CODEY_UI_SCRIPT: string = String.raw`((notify, expectedURL) => {
     const accepted = signature === previous || notify(state);
     if (accepted) previous = signature;
     if (!m || !accepted) { clear(); return; }
-    if (marked && (marked.workspace !== m.workspace || marked.footer !== m.footer)) clear();
+    if (marked && (marked.workspace !== m.workspace || marked.footer !== m.footer || marked.v2header !== m.v2header)) clear();
     marked = m;
-    if (m.header) m.workspace.setAttribute('data-hos-codey-header', '');
-    else m.workspace.removeAttribute('data-hos-codey-header');
-    m.footer.setAttribute('data-hos-codey-footer', ''); html.setAttribute('data-hos-codey-page', '');
+    mark(m.workspace, 'data-hos-codey-header', !!m.header);
+    mark(m.v2header, 'data-hos-codey-v2-header', true);
+    mark(m.footer, 'data-hos-codey-footer', true); mark(html, 'data-hos-codey-page', true);
   }
   function schedule() { if (!scheduled) scheduled = requestAnimationFrame(sync); }
   function action(command) {
     if (!allowed()) { sync(); return 'changed'; }
-    const m = collect();
-    if (!m || !marked || !['archive','console','logout','back'].includes(command)) return 'unavailable';
+    if (!['archive','console','logout','back'].includes(command)) return 'unavailable';
+    sync();
+    const m = marked;
+    if (!m) return 'unavailable';
     const control = command === 'back' ? m.back : m[command];
     if ((m.panel && (command === 'archive' || command === 'console')) || !enabled(control)) return 'unavailable';
     control.click(); schedule(); return 'clicked';
   }
   const back = () => {
-    if (!allowed()) return false;
-    const m = collect();
+    if (!allowed()) { sync(); return false; }
+    sync();
+    const m = marked;
     if (!m?.back) return false;
     if (enabled(m.back)) m.back.click();
     schedule(); return true;
   };
+  const contract = '.remote-shell,[data-codey-ui],[data-codey-scene],[data-codey-action],[data-codey-chrome],[data-codey-console-back]';
   new MutationObserver(records => {
     if (records.some(record => {
       const node = record.target.nodeType === 3 ? record.target.parentElement : record.target;
+      if (explicitRoot) {
+        if (record.type === 'characterData') return false;
+        if (record.type === 'attributes') return record.attributeName !== 'class' || node === explicitRoot || node?.contains?.(explicitRoot);
+        return [...record.addedNodes, ...record.removedNodes].some(changed => changed.nodeType === 1 &&
+          (changed.matches(contract) || changed.querySelector(contract)));
+      }
       return !node?.closest?.('.remote-messages,.remote-composer-dock');
     })) schedule();
   }).observe(doc.body, {subtree:true, childList:true, characterData:true, attributes:true,
-    attributeFilter:['class','hidden','disabled','aria-disabled','aria-pressed','checked']});
+    attributeFilter:['class','hidden','disabled','aria-disabled','aria-pressed','aria-label','role','checked',
+      'data-codey-ui','data-codey-scene','data-codey-action','data-codey-chrome','data-codey-console-back']});
   doc.addEventListener('change', event => { if (event.target.closest?.('.remote-sidebar-footer')) schedule(); });
   window.addEventListener('resize', schedule);
   window.addEventListener('hashchange', schedule);
@@ -141,5 +184,5 @@ export function codeyUiScript(expectedURL: string, token: string): string {
 
 export function codeyUiActionScript(expectedURL: string, command: string): string {
   if (['archive', 'console', 'logout', 'back'].indexOf(command) < 0) return '"unavailable"';
-  return '(() => { if (window !== window.top || location.href !== ' + JSON.stringify(expectedURL) + ') return "changed"; return window.__bridgeHarmonyCodeyUi?.action(' + JSON.stringify(command) + ') || "unavailable"; })()';
+  return '(() => { if (window !== window.top || location.href !== ' + JSON.stringify(expectedURL) + ') { window.__bridgeHarmonyCodeyUi?.sync(); return "changed"; } return window.__bridgeHarmonyCodeyUi?.action(' + JSON.stringify(command) + ') || "unavailable"; })()';
 }

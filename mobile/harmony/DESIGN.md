@@ -8,11 +8,11 @@
 
 网关应用切换在 Harmony 中收进聊天列表顶部：保留当前应用品牌图标，名称改为有“切换聊天应用”可访问标签的44px原生HTML选择器，为右侧原生更多菜单保留48px。独立 `ProviderSwitcher` postlude 在三个共享脚本之后、相同主框架和精确URL校验之内执行。它读取上游稳定的 `#client-switch` 当前按钮并调用原按钮的click，不绕过 `ClientNavigation.choose` 或另存应用状态。只在可用选择器已建立时隐藏 `.client-switch-dock` 和 `.client-functions`：账号管理、第三方通知、应用管理及返回电脑列表转入右上原生菜单，网页原按钮和onclick仍保留供菜单调用。标题随网关移动到DSH/Claude列表时选择器一同移动。轮询重建按钮、启停应用及快捷图标偏好通过单一观察器同步；没有可用源按钮或旧网关契约不符时保留原导航。此适配不修改网关源码或共用注入脚本，不增加刷新、原生桥接权限或新的DSH进程。
 
-Codey 远程页面由独立 `CodeyUi` postlude 识别 React 根、标题、电脑状态和侧栏三个原控件。标题与状态用 CSS grid 同排，不移动原节点；为搜索、新建和现有原生更多菜单分别保留位置。归档是查看归档列表的筛选，不是归档当前聊天；菜单选中状态来自原 checkbox/aria-pressed，控制台和设备退出也只点击原按钮。“已配对”保留认证含义，不改为执行进程在线。原生确认接管后才隐藏已完整识别的工具；未知控件保留原 UI。
+Codey 远程页面由独立 `CodeyUi` postlude 接管。Cindy 主导的前端在 `.remote-shell` 中用唯一 `data-codey-ui="2"` Workspace 声明 `list/create/conversation`，通过唯一 header/footer 和 `archive/console/logout/back` action 标记暴露原控件；按钮可以是 HTML button 或 RNWeb `role="button"`，不读取其文案、标题或自动样式类。完整校验及原生确认后隐藏 footer，header 右侧预留 64 px。未知显式版本或结构失配不得回落旧 collector。没有显式 schema 的已发布前端仍识别原 React 根、标题和电脑状态，保留紧凑 CSS grid；不移动或克隆节点。归档仍只是列表筛选，菜单状态来自原 checkbox/aria-pressed，控制台与设备退出也只点击原按钮。“已配对”不改为执行进程在线。详见[DOM v2 决定](../../.agents/notes/implemented/architecture/2026-11-13-harmony-codey-ui-dom-v2.md)。
 
-Codey 聊天沿用网页输入组件：附件、正文、发送/停止同排，权限与模型在其上方，模型与权限沿用原设置动作；不另造原生输入栏。网页头尾的原识别合同不变，搜索与新建各保留 44 px 栏位。详情仅将原生三入口区域设为 `Visibility.None`，Web 和站点组件保持原挂载位置；更多菜单可返回列表或切站点，回列表恢复底栏。主框架通过 `codey-ui:<导航 token>` 仅报告布尔状态；动作使用静态 allowlist，重新核验菜单打开时完整 URL、导航代次、来源和当前原控件，不运行页面提供的脚本。新增裸局域网主机默认 `http:18787`，完整 URL、显式端口、存量连接和公网 HTTPS 默认语义不变。[决定与验证](../../.agents/notes/implemented/bug-fix/2026-11-04-harmony-codey-compact-controls.md)。
+Codey 聊天沿用网页输入组件，不另造原生输入栏。v2 新建与会话页都通过 `CodeyUiState.chat` 将原生底栏设为 `Visibility.None`，列表和只读控制台为 false；旧前端沿用 `has-selection`。Web 和站点组件保持原挂载位置，回列表恢复底栏。控制台保留被外层 `[hidden]` 隐藏的 Workspace，只通过外层唯一 `data-codey-console-back` 返回；归档和控制台动作不可用，退出仍调用原控件。主框架通过 `codey-ui:<导航 token>` 仅报告现有布尔状态；动作使用静态 allowlist，重新核验菜单打开时完整 URL、导航代次、来源和当前原控件，不运行页面提供的脚本。观察器覆盖 schema、scene、action、chrome、禁用和选中属性；v2 不随输入或消息正文字符扫描、重复写接管标记。新增裸局域网主机默认 `http:18787`，完整 URL、显式端口、存量连接和公网 HTTPS 默认语义不变。[旧前端与原生边界](../../.agents/notes/implemented/bug-fix/2026-11-04-harmony-codey-compact-controls.md)。
 
-Keeper、CPA、Magpie 共用 56 vp 原生标题栏：左侧为单行 17 fp 站名，Keeper、CPA 右侧为网页返回、登录信息、更多三枚 24 vp SVG 图标，Magpie 常驻刷新、设置与更多，网页返回和登录信息在更多中；每枚按钮有 44 × 44 vp 点击区、包含站名的中文可访问名称和原生按压及焦点反馈。返回沿用浏览历史，登录信息显式打开该站点唯一的安全凭据面板，失活时禁用。Magpie 同时识别旧顶栏 `#prefs` 和新版 `body.web.side-nav #prefs`，只隐藏被原生接管的 `#sync/#prefs`，保留原顶栏、`#nav/#sideToggle/#navBack`、更新提示和有功能的 `#sideGw`。未知控件不猜测、不隐藏；不搬移或克隆网页节点、不新增服务 API。站名单行省略，为 320–360 vp 窄屏留出操作空间。历史返回不调用刷新或替换 URL。此布局仍需鸿蒙设备的实际渲染验证。
+Keeper、CPA、Magpie、Muse 共用 56 vp 原生标题栏：左侧为单行 17 fp 站名，Keeper、CPA、Muse 右侧为网页返回、登录信息、更多三枚 24 vp SVG 图标，Magpie 常驻刷新、设置与更多，网页返回和登录信息在更多中；每枚按钮有 44 × 44 vp 点击区、包含站名的中文可访问名称和原生按压及焦点反馈。返回沿用浏览历史，登录信息显式打开该站点唯一的安全凭据面板，失活时禁用。Magpie 同时识别旧顶栏 `#prefs` 和新版 `body.web.side-nav #prefs`，只隐藏被原生接管的 `#sync/#prefs`，保留原顶栏、`#nav/#sideToggle/#navBack`、更新提示和有功能的 `#sideGw`。未知控件不猜测、不隐藏；不搬移或克隆网页节点、不新增服务 API。站名单行省略，为 320–360 vp 窄屏留出操作空间。历史返回不调用刷新或替换 URL。此布局仍需鸿蒙设备的实际渲染验证。
 
 build40 使用用户明确选定的 C「同心圆环」原稿：三枚图标的圆心均为 (12,12)，外圈半径 9.25、线宽 1.6，颜色 `#303640`；圆框内分别为返回折线、实心钥匙孔和横向三点。按钮常态透明，44 vp 热区使用 22 vp 圆角，保留按压反馈并避免叠加常驻外框。三个管理页直接共用同一组资源；已选 App 图标与底部玻璃导航不变。
 
@@ -24,11 +24,13 @@ Keeper 不再叠加浮动更多按钮。网页顶部保留 48 px 当前分区/�
 
 ## 全宽原生底栏与 D App图标
 
-App 继续使用 D「刻线控制台」，名称 `Codex+`、bundleName 与已有图标资源保持不变。当前采用全宽三入口布局，不恢复旧版悬浮胶囊，也不在 Codey 网页增加重复导航。
+App 继续使用 D「刻线控制台」，名称 `Codex+`、bundleName 与已有图标资源保持不变。当前采用全宽四入口布局，不恢复旧版悬浮胶囊，也不在 Codey 网页增加重复导航。
 
-App 主形采用D的银白双门架与琥珀连接梁，背景 `#252A2C`，原始 SVG、透明前景和1024px PNG保存在 `branding/`，主形全部位于中央75%安全圆。导航沿用24vp原创单色填充图标资源。默认 `#303640`，选中 `#0A59F7`；选中图形同时由轮廓变为实心，保留文字与完整可访问名称。
+App 主形采用D的银白双门架与琥珀连接梁，背景 `#252A2C`，原始 SVG、透明前景和1024px PNG保存在 `branding/`，主形全部位于中央75%安全圆。导航沿用24vp原创单色填充图标资源。默认 `#303640`，选中 `#0A59F7`；原有图形选中时由轮廓变实心；Muse 采用官网默认手写 M 的本地重绘线稿，选中为官网蓝色范围，保留文字与完整可访问名称。
 
-底栏宽度为屏幕 100%、高度 56 vp，各入口等分可用宽度。保留 Codex、Keeper、Magpie，CPA 仅从 Codex 更多菜单进入。独立 Chat 及其原生配置入口不再显示；历史 Preferences、Cookie、登录信息和对话数据不删除、不迁移。Magpie 内部会话与 plugin-chat 导航照常保留，不安装独立 Chat 的强制选页/隐藏导航适配。`CodeyUiState.chat` 仍用于聊天详情隐藏底栏。[决定与验证](../../.agents/notes/implemented/bug-fix/2026-11-12-harmony-magpie-navigation.md)。图标在上、12 fp 标签在下，点击宽度不低于 44 vp，系统手势安全区由操作系统保留。
+底栏宽度为屏幕 100%、高度 56 vp，各入口等分可用宽度。保留 Codex、Keeper、Magpie、Muse，CPA 仅从 Codex 更多菜单进入。独立 Chat 及其原生配置入口不再显示；历史 Preferences、Cookie、登录信息和对话数据不删除、不迁移。Magpie 内部会话与 plugin-chat 导航照常保留，不安装独立 Chat 的强制选页/隐藏导航适配。`CodeyUiState.chat` 用于新建与聊天详情隐藏底栏。[决定与验证](../../.agents/notes/implemented/bug-fix/2026-11-12-harmony-magpie-navigation.md)。图标在上、12 fp 标签在下，点击宽度不低于 44 vp，系统手势安全区由操作系统保留。
+
+Muse 以独立 `muse` ID 接入通用 ServiceWeb，默认 `https://muse.ai/`，不覆盖或迁移隐藏的旧 Chat；登录与跨站授权由用户操作，HTTPS、外链确认和凭据来源绑定不放宽。[Muse 入口与图标决定](../../.agents/notes/implemented/feature/2026-11-13-harmony-muse-site.md)。
 
 底栏和设置预览复用 `NavigationMaterial`。原生 Row 的基底为 `#f8f8f5`，不再使用悬浮胶囊轮廓或独立装饰阴影；系统手势背景继续使用系统窗口约定。用户保存的模糊、系统材质模式与厚度设置不重置。
 

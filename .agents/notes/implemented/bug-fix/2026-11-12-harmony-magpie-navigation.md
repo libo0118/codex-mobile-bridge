@@ -14,6 +14,8 @@ Status: implemented
 
 ## Existing-note audit
 
+[Muse 入口](../feature/2026-11-13-harmony-muse-site.md)承接用户后续要求：底栏增加独立 Muse，旧 Chat 的隐藏与数据保留不变。
+
 按 Magpie、Chat 入口/页签/设置检索活跃 proposed、implemented、rejected 目录，命中以下四篇，均部分重叠而非完全吸收：
 
 - [独立 Chat 站点](../feature/2026-11-06-harmony-chat-site.md)：仅独立入口与设置入口的决定被取代，历史数据校验、凭据与 sandbox 协议仍有价值。

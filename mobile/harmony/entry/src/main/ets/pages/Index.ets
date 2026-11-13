@@ -211,7 +211,7 @@ struct Index {
     if (id === 'keeper') { this.closeServiceConfig(); return; }
     this.savingServices = this.savingServices.concat([id]);
     try {
-      const site = new ServiceSite(id, name || (id === 'chat' ? 'Chat' : id === 'cpa' ? 'CPA' : 'Magpie'), address, '', id === 'chat' ? enabled : true);
+      const site = new ServiceSite(id, name || (id === 'chat' ? 'Chat' : id === 'muse' ? 'Muse' : id === 'cpa' ? 'CPA' : 'Magpie'), address, '', id === 'chat' ? enabled : true);
       await this.serviceStore.save(site);
       this.services = this.services.map((item: ServiceSite) => item.id === id ? site : item);
       const wasLoaded = this.loadedServices.some((item: ServiceSite) => item.id === id);
@@ -556,6 +556,7 @@ struct Index {
     if (id === 'codex') return selected ? $r('app.media.nav_codex_selected') : $r('app.media.nav_codex');
     if (id === 'keeper') return selected ? $r('app.media.nav_keeper_selected') : $r('app.media.nav_keeper');
     if (id === 'cpa') return selected ? $r('app.media.nav_cpa_selected') : $r('app.media.nav_cpa');
+    if (id === 'muse') return selected ? $r('app.media.nav_muse_selected') : $r('app.media.nav_muse');
     if (id === 'chat') return selected ? $r('app.media.nav_chat_selected') : $r('app.media.nav_chat');
     return selected ? $r('app.media.nav_magpie_selected') : $r('app.media.nav_magpie');
   }
