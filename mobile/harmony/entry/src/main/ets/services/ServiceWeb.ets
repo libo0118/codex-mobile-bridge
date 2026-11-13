@@ -69,7 +69,7 @@ export struct ServiceWeb {
   private navigate(request: WebResourceRequest): boolean {
     const target = request.getRequestUrl();
     if (!request.isMainFrame()) return false;
-    if (this.allowed(target)) return false;
+    if (this.allowed(target) || (this.site.id === 'muse' && externalHTTP(target))) return false;
     if (request.isRequestGesture() && this.active && externalHTTP(target)) {
       AlertDialog.show({ title: '在浏览器打开外部链接？', message: target.split(new RegExp('[?#]'))[0].substring(0, 1024),
         primaryButton: { value: '取消', action: () => {} },
@@ -77,7 +77,7 @@ export struct ServiceWeb {
           this.context.startAbility({ action: 'ohos.want.action.viewData', uri: target, entities: ['entity.system.browsable'] }).catch(() => {});
         } }
       });
-    } else this.status = '已拦截非本站跳转，请核对站点地址，或在系统浏览器打开。';
+    } else this.status = this.site.id === 'muse' ? '已拦截非网页或无效链接，请在系统浏览器处理。' : '已拦截非本站跳转，请核对站点地址，或在系统浏览器打开。';
     return true;
   }
 

@@ -64,13 +64,15 @@ test('Muse redraw uses self-contained 24px vector marks, not the Chat bubble or 
 
 function serviceWeb() {
   const source = read('services/ServiceWeb.ets'), dialogs = [], launches = [], webCalls = [];
+  const fillStart = source.indexOf('  private async fill(');
+  assert.notEqual(fillStart, -1, 'test the production credential guard');
   const logic = source.slice(0, source.indexOf('  @Builder')).replace(/@\w+(?:\([^()\n]*\))?\s*/g, '')
-    .replace('struct ServiceWeb', 'class ServiceWeb') + '\n}';
+    .replace('struct ServiceWeb', 'class ServiceWeb') + source.slice(fillStart, source.indexOf('\n  @Builder', fillStart)) + '\n}';
   const context = vm.createContext({ getContext: () => ({ startAbility: async want => { launches.push(want); } }),
-    ServiceSite: class {}, webview: { WebCookieManager: { saveCookieAsync: async () => {} }, WebviewController: class {
+    webview: { WebCookieManager: { saveCookieAsync: async () => {} }, WebviewController: class {
       loadUrl() { webCalls.push('loadUrl'); } refresh() { webCalls.push('refresh'); } runJavaScript() { webCalls.push('script'); return Promise.resolve(''); }
     } }, AlertDialog: { show: dialog => dialogs.push(dialog) } });
-  vm.runInContext(strip(read('security/GatewayURL.ets') + '\n' + logic) + '\nthis.page = new ServiceWeb();', context);
+  vm.runInContext(strip(read('security/GatewayURL.ets') + '\n' + read('services/ServiceSite.ets') + '\n' + logic) + '\nthis.page = new ServiceWeb();', context);
   context.page.site = { id: 'muse', url: 'https://muse.ai/', loginOrigin: 'https://muse.ai' };
   context.page.active = true; context.page.initialURL = context.page.site.url; context.page.currentURL = context.page.site.url;
   return { page: context.page, dialogs, launches, webCalls, emit(name, event) {
@@ -95,14 +97,43 @@ test('Muse #weblink stays same-origin through navigation and history callbacks w
   assert.match(read('services/ServiceWeb.ets'), /Web\(\{ src: this\.initialURL, controller: this\.controller \}\)/);
 });
 
-test('blocked automatic top-level navigation is visible without opening an external app or leaking its URL', () => {
+test('only Muse allows cross-site HTTP(S) navigation without a gesture or an external app launch', () => {
+  for (const target of ['https://www.muse.ai/#weblink', 'https://login.example/continue?code=fixture#state', 'http://public.example/']) {
+    const h = serviceWeb();
+    assert.equal(h.emit('onLoadIntercept', { data: request(target) }), false, target);
+    assert.equal(h.page.status, ''); assert.equal(h.dialogs.length, 0); assert.equal(h.launches.length, 0);
+    for (const site of ['keeper', 'magpie', 'chat', 'cpa']) {
+      const other = serviceWeb(); other.page.site.id = site;
+      assert.equal(other.page.navigate(request(target)), true, site + ' remains origin-bound');
+    }
+  }
+});
+
+test('Muse web redirects do not grant credential scope, DOM injection or non-web protocol access', async () => {
+  const h = serviceWeb(), target = 'https://login.example/continue';
+  assert.equal(h.page.navigate(request(target)), false);
+  assert.equal(h.page.allowed(target), false, 'origin checks must not be broadened with navigation');
+  h.emit('onPageBegin', { url: target }); h.emit('onPageEnd', { url: target });
+  h.page.controller.getUrl = () => target;
+  await h.page.fill('fixture-user', 'fixture-secret', 'https://muse.ai/', 'password');
+  assert.equal(h.webCalls.length, 0); assert.equal(h.launches.length, 0);
+  assert.match(h.dialogs[0].message, /不匹配/);
+  for (const url of ['file:///private/fixture', 'intent://fixture', 'javascript:fixture()', 'data:text/html,fixture']) {
+    const other = serviceWeb();
+    assert.equal(other.page.navigate(request(url)), true, url);
+    assert.equal(other.launches.length, 0); assert.equal(other.dialogs.length, 0);
+  }
+});
+
+test('non-Muse blocked automatic top-level navigation remains visible without opening an external app or leaking its URL', () => {
   const h = serviceWeb(), target = 'https://external.example/login?code=private-code#private-token';
+  h.page.site = { id: 'keeper', url: 'https://keeper.example/', loginOrigin: 'https://keeper.example' };
   assert.equal(h.page.navigate(request(target)), true);
   assert.match(h.page.status, /拦截/);
   assert.doesNotMatch(h.page.status, /external|private-code|private-token/);
   assert.equal(h.dialogs.length, 0); assert.equal(h.launches.length, 0);
   h.page.status = '';
-  assert.equal(h.page.navigate(request('https://muse.ai/login')), false);
+  assert.equal(h.page.navigate(request('https://keeper.example/login')), false);
   assert.equal(h.page.navigate(request(target, false)), false);
   assert.equal(h.page.status, '');
   assert.equal(h.page.navigate(request(target, true, true)), true);

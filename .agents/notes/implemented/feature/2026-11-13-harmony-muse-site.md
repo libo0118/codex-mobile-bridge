@@ -9,10 +9,10 @@ Status: implemented
 ## Decision
 
 - 默认新增独立 `muse` 站点，地址 `https://muse.ai/`。底栏与 Codey 详情的站点切换为 Codex、Keeper、Magpie、Muse，CPA 仍在更多；旧 `chat` 继续隐藏，Preferences、Cookie、凭据和对话不删除、不复制或迁移。
-- Muse 使用现有通用 ServiceWeb 和独立凭据 ID，允许正常 HTTPS 地址设置。仍保留来源／路径绑定、主动外链确认、禁止混合内容及原生桥接限制；不安装 Chat 或 Magpie 页面适配，不自动登录、提交或接受外部授权。
+- Muse 使用现有通用 ServiceWeb 和独立凭据 ID，允许正常 HTTPS 地址设置。凭据／注入的来源和路径绑定、禁止混合内容及原生桥接限制不变；Muse 网页导航按后续用户确认的[独立导航策略](2026-11-13-harmony-muse-web-navigation.md)允许 HTTP/HTTPS 跨站，其他服务的外链确认不变。不安装 Chat 或 Magpie 页面适配，不自动登录、提交或接受外部授权。
 - 图标依据官网公开 `https://muse.ai/images/favicon/app-squiggle.svg` 的手写 M 形态重新绘制为本地 24×24 SVG；常态深灰，选中采用官网蓝色范围。资源不包含远程图片、脚本或 display-p3 样式，不复用旧聊天气泡。
 - `ServiceWeb` 对主框架网络错误显示数值错误码，对 HTTP 错误显示状态码，对未获用户动作的外站导航显示拦截提示；不显示响应正文、查询参数或片段。Muse 的更多菜单提供用户主动的“用系统浏览器打开 Muse”，仅转交配置中的公开 HTTPS 地址，不转交当前登录页地址或凭据；不自动打开、不伪装浏览器或扩大允许来源。
-- 每次 HAP 更新同时递增显示版本和构建号，并同步构建清单、关于页及 UA 的版本标记，保持同一应用身份；本候选为 2.1.2/build 45。
+- 每次 HAP 更新同时递增显示版本和构建号，并同步构建清单、关于页及 UA 的版本标记，保持同一应用身份。
 
 ## Existing-note audit
 

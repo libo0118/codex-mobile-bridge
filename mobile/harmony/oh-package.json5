@@ -1,7 +1,7 @@
 {
   "modelVersion": "6.0.0",
   "name": "codex-mobile-bridge-harmony",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "HarmonyOS native host for Codex Mobile Bridge",
   "license": "MIT",
   "dependencies": {},
